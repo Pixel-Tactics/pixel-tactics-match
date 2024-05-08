@@ -1,9 +1,8 @@
 package ws
 
 import (
-	"fortraiders.com/match/src/types"
+	"pixeltactics.com/match/src/types"
 
-	"log"
 	"net/http"
 	"time"
 
@@ -100,7 +99,6 @@ func (client *Client) handleSend() {
 func ServeWebSocket(hub *ClientHub, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
 		return
 	}
 

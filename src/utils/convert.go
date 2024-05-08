@@ -2,19 +2,35 @@ package utils
 
 import (
 	"encoding/json"
-	"errors"
+
+	"pixeltactics.com/match/src/exceptions"
 )
 
-func MapToObject(data map[string]string, obj any) error {
+func MapToObject(data map[string]interface{}, obj any) error {
 	encoded, err := json.Marshal(data)
 	if err != nil {
-		return errors.New("data is invalid")
+		return exceptions.InvalidDataError()
 	}
 
 	err = json.Unmarshal(encoded, obj)
 	if err != nil {
-		return errors.New("data is invalid")
+		return exceptions.InvalidDataError()
 	}
 
 	return nil
+}
+
+func ObjectToMap(obj any) (map[string]interface{}, error) {
+	encoded, err := json.Marshal(obj)
+	if err != nil {
+		return nil, exceptions.InvalidDataError()
+	}
+
+	var data map[string]interface{}
+	err = json.Unmarshal(encoded, &data)
+	if err != nil {
+		return nil, exceptions.InvalidDataError()
+	}
+
+	return data, nil
 }

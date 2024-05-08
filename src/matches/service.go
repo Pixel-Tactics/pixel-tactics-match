@@ -3,7 +3,7 @@ package matches
 import (
 	"errors"
 
-	"fortraiders.com/match/src/utils"
+	"pixeltactics.com/match/src/utils"
 )
 
 var repo = GetSessionRepository()
@@ -54,7 +54,7 @@ type GetSessionResponseDTO struct {
 	AvailableHeroList []string `json:"available"`
 }
 
-func (service MatchService) GetSessionEndpoint(data GetSessionRequestDTO) (*GetSessionResponseDTO, error) {
+func (service MatchService) GetSession(data GetSessionRequestDTO) (*GetSessionResponseDTO, error) {
 	session := repo.GetSessionById(data.sessionId)
 	if session == nil {
 		return nil, errors.New("session not found")

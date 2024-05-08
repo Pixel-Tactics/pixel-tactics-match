@@ -1,4 +1,4 @@
-module fortraiders.com/match
+module pixeltactics.com/match
 
 go 1.22.2
 

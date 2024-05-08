@@ -3,38 +3,42 @@ package types
 import (
 	"encoding/json"
 	"errors"
+
+	"pixeltactics.com/match/src/exceptions"
 )
 
 type MessageAction string
 
 const (
-	ACTION_GET  MessageAction = "GET"
-	ACTION_POST MessageAction = "POST"
-	ACTION_AUTH MessageAction = "AUTH"
+	ACTION_CREATE_SESSION MessageAction = "CREATE_SESSION"
+	ACTION_GET_SESSION    MessageAction = "GET_SESSION"
+	ACTION_AUTH           MessageAction = "AUTH"
+	ACTION_ERROR          MessageAction = "ERROR"
+	ACTION_FEEDBACK       MessageAction = "FEEDBACK"
 )
 
 type Message struct {
 	Action MessageAction
-	Body   map[string]string
+	Body   map[string]interface{}
 }
 
 func JsonBytesToMessage(jsonBytes []byte) (*Message, error) {
 	var raw map[string]json.RawMessage
 	err := json.Unmarshal(jsonBytes, &raw)
 	if err != nil {
-		return nil, errors.New("json is invalid")
+		return nil, exceptions.InvalidJsonError()
 	}
 
 	var action MessageAction
 	err = json.Unmarshal(raw["action"], &action)
 	if err != nil {
-		return nil, errors.New("json is invalid")
+		return nil, exceptions.InvalidJsonError()
 	}
 
-	var body map[string]string
+	var body map[string]interface{}
 	err = json.Unmarshal(raw["body"], &body)
 	if err != nil {
-		return nil, errors.New("json is invalid")
+		return nil, exceptions.InvalidJsonError()
 	}
 
 	return &Message{Action: action, Body: body}, nil
