@@ -17,18 +17,18 @@ func (handler *SessionHandler) GetSession(req *types.Request, res *types.Respons
 	var body matches.GetSessionRequestDTO
 	err := utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(errors.New("invalid message body")))
+		res.SendToClient(utils.ErrorMessage(req.Message.Identifier, errors.New("invalid message body")))
 		return
 	}
 	session, err := handler.MatchService.GetSession(body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(utils.ErrorMessage(req.Message.Identifier, err))
 		return
 	}
 
 	resBody, err := utils.ObjectToMap(session)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(utils.ErrorMessage(req.Message.Identifier, err))
 		return
 	}
 
@@ -42,24 +42,24 @@ func (handler *SessionHandler) CreateSession(req *types.Request, res *types.Resp
 	var body matches.CreateSessionRequestDTO
 	err := utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(errors.New("invalid message body")))
+		res.SendToClient(utils.ErrorMessage(req.Message.Identifier, errors.New("invalid message body")))
 		return
 	}
 
 	if body.PlayerId == body.OpponentId {
-		res.SendToClient(utils.ErrorMessage(errors.New("invalid opponent")))
+		res.SendToClient(utils.ErrorMessage(req.Message.Identifier, errors.New("invalid opponent")))
 		return
 	}
 
 	session, err := handler.MatchService.CreateSession(body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(utils.ErrorMessage(req.Message.Identifier, err))
 		return
 	}
 
 	sessionMap, err := utils.ObjectToMap(session)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(utils.ErrorMessage(req.Message.Identifier, err))
 		return
 	}
 
@@ -71,7 +71,7 @@ func (handler *SessionHandler) CreateSession(req *types.Request, res *types.Resp
 			},
 		})
 		res.SendToClient(&types.Message{
-			Action: types.ACTION_CREATE_SESSION_FEEDBACK,
+			Action: types.ACTION_FEEDBACK,
 			Body: map[string]interface{}{
 				"success": true,
 			},

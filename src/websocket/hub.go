@@ -102,13 +102,15 @@ func (hub *ClientHub) Run() {
 					Message: message,
 				},
 				Response: &types.Response{
-					SendToClient: func(message *types.Message) {
-						client.receive <- message
+					SendToClient: func(inMessage *types.Message) {
+						inMessage.Identifier = message.Identifier
+						client.receive <- inMessage
 					},
-					SendToOtherClient: func(playerId string, message *types.Message) {
+					SendToOtherClient: func(playerId string, inMessage *types.Message) {
+						inMessage.Identifier = "notification"
 						otherClient, ok := hub.GetClientFromPlayerId(playerId)
 						if ok {
-							otherClient.receive <- message
+							otherClient.receive <- inMessage
 						}
 					},
 					RegisterPlayer: func(playerId string) {

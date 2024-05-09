@@ -17,7 +17,7 @@ func (handler *AuthHandler) AuthenticateClient(req *types.Request, res *types.Re
 	var body AuthMessageBody
 	err := utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(utils.ErrorMessage(req.Message.Identifier, err))
 		return
 	}
 
