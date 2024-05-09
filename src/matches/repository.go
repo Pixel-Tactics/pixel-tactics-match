@@ -5,7 +5,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/puzpuzpuz/xsync/v3"
-	"pixeltactics.com/match/src/utils"
 )
 
 type SessionRepository struct {
@@ -60,11 +59,6 @@ func (repo SessionRepository) CreateSession(player *Player, opponent *Player) (*
 		return nil, errors.New("duplicate session id")
 	}
 
-	key, err := utils.GenerateSecureKey(32)
-	if err != nil {
-		return nil, err
-	}
-
 	matchMap, err := GenerateMap()
 	if err != nil {
 		return nil, err
@@ -77,7 +71,6 @@ func (repo SessionRepository) CreateSession(player *Player, opponent *Player) (*
 
 	newSession := &Session{
 		Id:                newSessionId,
-		Secret:            key,
 		Player1:           player,
 		Player2:           opponent,
 		Running:           false,

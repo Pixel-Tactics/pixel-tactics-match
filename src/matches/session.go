@@ -5,8 +5,7 @@ import (
 )
 
 type Player struct {
-	Id     string `json:"id"`
-	Secret string `json:"secret"`
+	Id string `json:"id"`
 }
 
 type MatchMap struct {

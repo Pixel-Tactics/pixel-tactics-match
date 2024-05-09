@@ -2,8 +2,6 @@ package matches
 
 import (
 	"errors"
-
-	"pixeltactics.com/match/src/utils"
 )
 
 var repo = GetSessionRepository()
@@ -16,24 +14,13 @@ type CreateSessionRequestDTO struct {
 }
 
 func (service MatchService) CreateSession(data CreateSessionRequestDTO) (*Session, error) {
-	playerSecret, err := utils.GenerateSecureKey(32)
-	if err != nil {
-		return nil, err
-	}
-	opponentSecret, err := utils.GenerateSecureKey(32)
-	if err != nil {
-		return nil, err
-	}
-
 	// TODO: auth middleware (for player)
-	// TODO: check by fetch from account service (for opponent)
+	// TODO: check by fetch from account service (to check opponent if they exists)
 	player := &Player{
-		Id:     data.PlayerId,
-		Secret: playerSecret,
+		Id: data.PlayerId,
 	}
 	opponent := &Player{
-		Id:     data.OpponentId,
-		Secret: opponentSecret,
+		Id: data.OpponentId,
 	}
 
 	session, err := repo.CreateSession(player, opponent)
