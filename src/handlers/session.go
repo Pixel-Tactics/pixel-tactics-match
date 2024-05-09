@@ -17,18 +17,18 @@ func (handler *SessionHandler) GetSession(req *types.Request, res *types.Respons
 	var body matches.GetSessionRequestDTO
 	err := utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
-		utils.ErrorMessage(errors.New("invalid message body"))
+		res.SendToClient(utils.ErrorMessage(errors.New("invalid message body")))
 		return
 	}
 	session, err := handler.MatchService.GetSession(body)
 	if err != nil {
-		utils.ErrorMessage(err)
+		res.SendToClient(utils.ErrorMessage(err))
 		return
 	}
 
 	resBody, err := utils.ObjectToMap(session)
 	if err != nil {
-		utils.ErrorMessage(err)
+		res.SendToClient(utils.ErrorMessage(err))
 		return
 	}
 
@@ -42,19 +42,19 @@ func (handler *SessionHandler) CreateSession(req *types.Request, res *types.Resp
 	var body matches.CreateSessionRequestDTO
 	err := utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
-		utils.ErrorMessage(err)
+		res.SendToClient(utils.ErrorMessage(errors.New("invalid message body")))
 		return
 	}
 
 	session, err := handler.MatchService.CreateSession(body)
 	if err != nil {
-		utils.ErrorMessage(err)
+		res.SendToClient(utils.ErrorMessage(err))
 		return
 	}
 
 	resBody, err := utils.ObjectToMap(session)
 	if err != nil {
-		utils.ErrorMessage(err)
+		res.SendToClient(utils.ErrorMessage(err))
 		return
 	}
 
