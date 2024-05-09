@@ -105,6 +105,12 @@ func (hub *ClientHub) Run() {
 					SendToClient: func(message *types.Message) {
 						client.receive <- message
 					},
+					SendToOtherClient: func(playerId string, message *types.Message) {
+						otherClient, ok := hub.GetClientFromPlayerId(playerId)
+						if ok {
+							otherClient.receive <- message
+						}
+					},
 					RegisterPlayer: func(playerId string) {
 						hub.RegisterPlayer(playerId, client)
 					},
