@@ -10,11 +10,14 @@ import (
 type MessageAction string
 
 const (
-	ACTION_CREATE_SESSION MessageAction = "CREATE_SESSION"
-	ACTION_GET_SESSION    MessageAction = "GET_SESSION"
-	ACTION_AUTH           MessageAction = "AUTH"
-	ACTION_ERROR          MessageAction = "ERROR"
-	ACTION_FEEDBACK       MessageAction = "FEEDBACK"
+	ACTION_CREATE_SESSION          MessageAction = "CREATE_SESSION"
+	ACTION_CREATE_SESSION_FEEDBACK MessageAction = "CREATE_SESSION_FEEDBACK"
+	ACTION_GET_SESSION             MessageAction = "GET_SESSION"
+	ACTION_INVITE_SESSION          MessageAction = "INVITE_SESSION"
+	ACTION_START_SESSION           MessageAction = "START_SESSION"
+	ACTION_AUTH                    MessageAction = "AUTH"
+	ACTION_ERROR                   MessageAction = "ERROR"
+	ACTION_FEEDBACK                MessageAction = "FEEDBACK"
 )
 
 type Message struct {

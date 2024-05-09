@@ -47,7 +47,7 @@ func (client *Client) handleReceive() {
 
 		message, err := types.JsonBytesToMessage(jsonBytes)
 		if err != nil {
-			break
+			continue
 		}
 
 		client.hub.message <- &MessageWithClient{

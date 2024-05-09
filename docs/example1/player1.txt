@@ -1,0 +1,13 @@
+{
+    "action": "AUTH",
+    "body": {
+        "playerToken": "1"
+    }
+}
+
+{
+    "action": "CREATE_SESSION",
+    "body": {
+        "opponentId": "2"
+    }
+}

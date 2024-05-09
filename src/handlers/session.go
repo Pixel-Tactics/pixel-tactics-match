@@ -46,22 +46,49 @@ func (handler *SessionHandler) CreateSession(req *types.Request, res *types.Resp
 		return
 	}
 
+	if body.PlayerId == body.OpponentId {
+		res.SendToClient(utils.ErrorMessage(errors.New("invalid opponent")))
+		return
+	}
+
 	session, err := handler.MatchService.CreateSession(body)
 	if err != nil {
 		res.SendToClient(utils.ErrorMessage(err))
 		return
 	}
 
-	resBody, err := utils.ObjectToMap(session)
+	sessionMap, err := utils.ObjectToMap(session)
 	if err != nil {
 		res.SendToClient(utils.ErrorMessage(err))
 		return
 	}
 
-	res.SendToClient(&types.Message{
-		Action: types.ACTION_FEEDBACK,
-		Body:   resBody,
-	})
+	if !session.Running {
+		res.SendToOtherClient(body.OpponentId, &types.Message{
+			Action: types.ACTION_INVITE_SESSION,
+			Body: map[string]interface{}{
+				"playerId": body.PlayerId,
+			},
+		})
+		res.SendToClient(&types.Message{
+			Action: types.ACTION_CREATE_SESSION_FEEDBACK,
+			Body: map[string]interface{}{
+				"success": true,
+			},
+		})
+	} else {
+		res.SendToOtherClient(body.OpponentId, &types.Message{
+			Action: types.ACTION_START_SESSION,
+			Body: map[string]interface{}{
+				"playerId": body.PlayerId,
+				"session":  sessionMap,
+			},
+		})
+		res.SendToClient(&types.Message{
+			Action: types.ACTION_START_SESSION,
+			Body:   sessionMap,
+		})
+	}
 }
 
 func (handler *SessionHandler) Run() {

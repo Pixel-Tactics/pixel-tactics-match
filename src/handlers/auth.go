@@ -23,6 +23,16 @@ func (handler *AuthHandler) AuthenticateClient(req *types.Request, res *types.Re
 
 	// TODO: Change this to JWT or smth
 	playerId := body.PlayerToken
+	if len(playerId) == 0 {
+		res.SendToClient(&types.Message{
+			Action: types.ACTION_ERROR,
+			Body: map[string]interface{}{
+				"status":  "failed",
+				"message": "invalid player token",
+			},
+		})
+		return
+	}
 
 	res.RegisterPlayer(playerId)
 	res.SendToClient(&types.Message{
