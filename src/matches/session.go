@@ -38,7 +38,6 @@ func GetAvailableHeroes() (*[]string, error) {
 
 type Session struct {
 	Id                string
-	Secret            string
 	Player1           *Player
 	Player2           *Player
 	Running           bool

@@ -32,8 +32,7 @@ func (service MatchService) CreateSession(data CreateSessionRequestDTO) (*Sessio
 }
 
 type GetSessionRequestDTO struct {
-	sessionId     string
-	sessionSecret string
+	sessionId string
 }
 
 type GetSessionResponseDTO struct {
@@ -45,10 +44,6 @@ func (service MatchService) GetSession(data GetSessionRequestDTO) (*GetSessionRe
 	session := repo.GetSessionById(data.sessionId)
 	if session == nil {
 		return nil, errors.New("session not found")
-	}
-
-	if session.Secret != data.sessionSecret {
-		return nil, errors.New("session secret is not valid")
 	}
 
 	var res GetSessionResponseDTO
