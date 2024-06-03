@@ -16,8 +16,8 @@ type PlayerRegistration struct {
 }
 
 type PlayerHub struct {
-	playerIdToClient map[string]*Client
-	clientToPlayerId map[*Client]string
+	playerIdToClient map[string]*Client // TODO: make sync
+	clientToPlayerId map[*Client]string // TODO: make sync
 }
 
 func (hub *PlayerHub) RegisterPlayer(playerId string, client *Client) {
@@ -38,7 +38,7 @@ func (hub *PlayerHub) UnregisterPlayer(client *Client) {
 
 type ClientHub struct {
 	playerHub      *PlayerHub
-	clientList     map[*Client]bool
+	clientList     map[*Client]bool // TODO: make sync
 	registerClient chan *Client
 	registerPlayer chan *PlayerRegistration
 	unregister     chan *Client
@@ -106,7 +106,11 @@ func (hub *ClientHub) Run() {
 						inMessage.Identifier = message.Identifier
 						client.receive <- inMessage
 					},
-					SendToOtherClient: func(playerId string, inMessage *types.Message) {
+					NotifyClient: func(inMessage *types.Message) {
+						inMessage.Identifier = "notification"
+						client.receive <- inMessage
+					},
+					NotifyOtherClient: func(playerId string, inMessage *types.Message) {
 						inMessage.Identifier = "notification"
 						otherClient, ok := hub.GetClientFromPlayerId(playerId)
 						if ok {

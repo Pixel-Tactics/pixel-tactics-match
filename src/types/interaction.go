@@ -6,7 +6,8 @@ type Request struct {
 
 type Response struct {
 	SendToClient      func(message *Message)
-	SendToOtherClient func(playerId string, message *Message)
+	NotifyClient      func(message *Message)
+	NotifyOtherClient func(playerId string, message *Message)
 	RegisterPlayer    func(playerId string)
 	// SendToClient func(data map[string]interface{}, action MessageAction)
 	// SendToClientsInSession func() error

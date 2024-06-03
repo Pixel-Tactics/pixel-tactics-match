@@ -14,15 +14,19 @@ const (
 	ACTION_GET_SESSION    MessageAction = "GET_SESSION"
 	ACTION_INVITE_SESSION MessageAction = "INVITE_SESSION"
 	ACTION_START_SESSION  MessageAction = "START_SESSION"
+	ACTION_PREPARE_PLAYER MessageAction = "PREPARE_PLAYER"
+	ACTION_SERVER_TIME    MessageAction = "SERVER_TIME"
 	ACTION_AUTH           MessageAction = "AUTH"
-	ACTION_ERROR          MessageAction = "ERROR"
+	ACTION_ERROR          MessageAction = "ERROR_FEEDBACK"
 	ACTION_FEEDBACK       MessageAction = "FEEDBACK"
+	ACTION_ENEMY_ACTION   MessageAction = "ENEMY_ACTION"
+	ACTION_START_BATTLE   MessageAction = "START_BATTLE"
 )
 
 type Message struct {
-	Action     MessageAction
-	Identifier string
-	Body       map[string]interface{}
+	Action     MessageAction          `json:"action"`
+	Identifier string                 `json:"identifier"`
+	Body       map[string]interface{} `json:"body"`
 }
 
 func JsonBytesToMessage(jsonBytes []byte) (*Message, error) {
