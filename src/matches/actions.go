@@ -2,44 +2,43 @@ package matches
 
 import (
 	"errors"
-	"strings"
 
 	"pixeltactics.com/match/src/exceptions"
-	"pixeltactics.com/match/src/utils"
 )
 
 type IAction interface {
 	apply(session *Session) error
 	getSourcePlayerId() string
+	getData() map[string]interface{}
 	getName() string
 }
 
 type MoveLog struct {
-	PlayerId      string
-	HeroName      string
-	DirectionList []string
+	srcHero       *Hero
+	directionList []string
 }
 
-func (log MoveLog) apply(session *Session) error {
-	hero, err := session.getHeroOnPlayer(log.PlayerId, log.HeroName)
-	if err != nil {
-		return err
-	}
+type MoveLogData struct {
+	HeroName      string   `json:"heroName"`
+	PlayerId      string   `json:"playerId"`
+	DirectionList []string `json:"directionList"`
+}
 
-	if !hero.canMove(session.currentTurn) {
+func (log *MoveLog) apply(session *Session) error {
+	if !log.srcHero.canMove() {
 		return errors.New("hero already moved this turn")
 	}
 
-	if hero.Health == 0 {
+	if log.srcHero.Health == 0 {
 		return exceptions.HeroIsDead()
 	}
 
-	if len(log.DirectionList) > hero.GetBaseStats().Range {
+	if len(log.directionList) > log.srcHero.GetBaseStats().MoveRange {
 		return errors.New("invalid movement range")
 	}
 
-	curPos := hero.Pos
-	for _, dir := range log.DirectionList {
+	curPos := log.srcHero.Pos
+	for _, dir := range log.directionList {
 		dirPoint := GetPointFromDirection(dir)
 		curPos = curPos.Add(dirPoint)
 		if !session.isPointOpen(curPos) {
@@ -47,70 +46,71 @@ func (log MoveLog) apply(session *Session) error {
 		}
 	}
 
-	hero.Pos = curPos
-	hero.lastMoveTurn = session.currentTurn
+	log.srcHero.Pos = curPos
+	log.srcHero.lastMoveTurn = session.currentTurn
 	return nil
 }
 
-func (log MoveLog) getSourcePlayerId() string {
-	return log.PlayerId
+func (log *MoveLog) getSourcePlayerId() string {
+	return log.srcHero.player.Id
 }
 
-func (log MoveLog) getName() string {
-	return log.PlayerId + ": " + log.HeroName + " moved " + strings.Join(log.DirectionList, " ")
+func (log *MoveLog) getData() map[string]interface{} {
+	return map[string]interface{}{
+		"hero":          log.srcHero.GetName(),
+		"playerId":      log.srcHero.player.Id,
+		"directionList": log.directionList,
+	}
+}
+
+func (log *MoveLog) getName() string {
+	return "move"
 }
 
 type AttackLog struct {
-	SourcePlayerId string
-	SourceHeroName string
-	TargetPlayerId string
-	TargetHeroName string
-	Pos            Point
+	srcHero *Hero
+	trgHero *Hero
+	damage  int
 }
 
-func (log AttackLog) apply(session *Session) error {
-	srcHero, srcErr := session.getHeroOnPlayer(log.SourcePlayerId, log.SourceHeroName)
-	if srcErr != nil {
-		return srcErr
+type AttackLogData struct {
+	HeroName   string `json:"heroName"`
+	PlayerId   string `json:"playerId"`
+	TargetName string `json:"targetName"`
+}
+
+func (log *AttackLog) apply(session *Session) error {
+	if !log.srcHero.canAttack() {
+		return errors.New("hero cannot attack")
 	}
 
-	if !srcHero.canAttack(session.currentTurn) {
-		return errors.New("hero already attacked this turn")
+	attackRange := log.srcHero.GetBaseStats().AttackRange
+	damage := log.srcHero.GetBaseStats().Damage
+
+	dist, err := CheckDistance(session.matchMap.Structure, log.srcHero.Pos, log.trgHero.Pos)
+	if dist > attackRange || err != nil {
+		return errors.New("target out of range")
 	}
 
-	if srcHero.Health == 0 {
-		return exceptions.HeroIsDead()
-	}
-
-	damage := srcHero.GetBaseStats().Damage
-	srcHero.Health = max(srcHero.Health-damage, 0)
-	srcHero.lastAttackTurn = session.currentTurn
+	log.damage = damage
+	log.srcHero.lastAttackTurn = session.currentTurn
+	log.trgHero.Health = max(log.trgHero.Health-damage, 0)
 	return nil
 }
 
-func (log AttackLog) getSourcePlayerId() string {
-	return log.SourcePlayerId
+func (log *AttackLog) getSourcePlayerId() string {
+	return log.srcHero.player.Id
 }
 
-func GetAction(actionName string, actionBody map[string]interface{}) (IAction, error) {
-	if actionName == "move" {
-		var action MoveLog
-		err := utils.MapToObject(actionBody, &action)
-		if err != nil {
-			return nil, err
-		}
-		return action, nil
-	} else if actionName == "attack" {
-		var action AttackLog
-		err := utils.MapToObject(actionBody, &action)
-		if err != nil {
-			return nil, err
-		}
-		return action, nil
+func (log *AttackLog) getData() map[string]interface{} {
+	return map[string]interface{}{
+		"hero":     log.srcHero.GetName(),
+		"target":   log.trgHero.GetName(),
+		"playerId": log.srcHero.player.Id,
+		"damage":   log.damage,
 	}
-	return nil, errors.New("invalid action name")
 }
 
-func (log AttackLog) getName() string {
-	return log.SourcePlayerId + ": " + log.SourceHeroName + " attacked " + log.TargetHeroName
+func (log *AttackLog) getName() string {
+	return "attack"
 }

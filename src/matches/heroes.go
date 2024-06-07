@@ -1,41 +1,58 @@
 package matches
 
-type HeroTemplateStats struct {
-	MaxHealth int
-	Damage    int
-	Range     int
+type Hero struct {
+	Health         int   `json:"health"`
+	Pos            Point `json:"pos"`
+	lastMoveTurn   int
+	lastAttackTurn int
+	player         *Player
+	HeroTemplate   `json:"template"`
 }
 
-type HeroTemplate interface {
-	GetBaseStats() HeroTemplateStats
-	GetName() string
-}
-
-type Knight struct{}
-
-// GetStats implements HeroTemplate.
-func (k Knight) GetBaseStats() HeroTemplateStats {
-	return HeroTemplateStats{
-		MaxHealth: 10,
-		Damage:    4,
-		Range:     1,
+func (h *Hero) canMove() bool {
+	if h.Health == 0 {
+		return false
+	}
+	if h.lastAttackTurn >= h.player.session.currentTurn {
+		return false
+	} else if h.lastMoveTurn >= h.player.session.currentTurn {
+		return false
+	} else {
+		return true
 	}
 }
 
-func (k Knight) GetName() string {
-	return "knight"
+func (h *Hero) canAttack() bool {
+	if h.Health == 0 {
+		return false
+	}
+	if h.lastMoveTurn == h.player.session.currentTurn {
+		action, avail := h.player.session.getLastAction()
+		if avail {
+			moveAction, ok := action.(*MoveLog)
+			if ok && moveAction.srcHero != h {
+				return false
+			}
+		}
+	}
+	return h.lastAttackTurn < h.player.session.currentTurn
 }
 
-type Mage struct{}
-
-func (m Mage) GetBaseStats() HeroTemplateStats {
-	return HeroTemplateStats{
-		MaxHealth: 6,
-		Damage:    2,
-		Range:     3,
+func (h *Hero) getData() map[string]interface{} {
+	return map[string]interface{}{
+		"health":   h.Health,
+		"pos":      h.Pos,
+		"template": h.HeroTemplate.GetData(),
 	}
 }
 
-func (m Mage) GetName() string {
-	return "mage"
+func NewHero(template HeroTemplate, player *Player) *Hero {
+	baseStats := template.GetBaseStats()
+	return &Hero{
+		Health:         baseStats.MaxHealth,
+		HeroTemplate:   template,
+		player:         player,
+		lastMoveTurn:   -2,
+		lastAttackTurn: -2,
+	}
 }

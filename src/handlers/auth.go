@@ -46,7 +46,7 @@ func (handler *AuthHandler) AuthenticateClient(req *types.Request, res *types.Re
 
 func NewAuthHandler() *AuthHandler {
 	return &AuthHandler{
-		Interaction: make(chan *types.Interaction),
+		Interaction: make(chan *types.Interaction, 256),
 	}
 }
 

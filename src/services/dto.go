@@ -26,7 +26,7 @@ type PrepareSessionRequestDTO struct {
 }
 
 type ExecuteActionRequestDTO struct {
-	PlayerId       string
-	ActionName     string
-	ActionSpecific map[string]interface{}
+	PlayerId       string                 `json:"playerId"`
+	ActionName     string                 `json:"actionName"`
+	ActionSpecific map[string]interface{} `json:"actionSpecific"`
 }

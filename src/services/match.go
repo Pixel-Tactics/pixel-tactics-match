@@ -48,7 +48,7 @@ func (service *MatchService) PreparePlayer(data PreparePlayerRequestDTO) (bool, 
 		return false, exceptions.SessionNotFound()
 	}
 
-	chosenHeroList, err := service.nameToHeroList(data.ChosenHeroList)
+	chosenHeroList, err := service.nameToTemplate(data.ChosenHeroList)
 	if err != nil {
 		return false, err
 	}
@@ -69,21 +69,22 @@ func (service *MatchService) PreparePlayer(data PreparePlayerRequestDTO) (bool, 
 }
 
 func (service *MatchService) ExecuteAction(data ExecuteActionRequestDTO) error {
-	session := service.sessionRepository.GetSessionById(data.PlayerId)
+	session := service.sessionRepository.GetSessionByPlayerId(data.PlayerId)
 	if session == nil {
 		return exceptions.SessionNotFound()
 	}
 
-	action, err := matches.GetAction(data.ActionName, data.ActionSpecific)
-	if err != nil {
-		return err
+	data.ActionSpecific["playerId"] = data.PlayerId
+	return session.ExecuteAction(data.ActionName, data.ActionSpecific)
+}
+
+func (service *MatchService) EndTurn(playerId string) error {
+	session := service.sessionRepository.GetSessionByPlayerId(playerId)
+	if session == nil {
+		return exceptions.SessionNotFound()
 	}
 
-	err = session.ExecuteAction(action)
-	if err != nil {
-		return err
-	}
-	return nil
+	return session.EndTurn(playerId)
 }
 
 func (service *MatchService) GetOpponentId(playerId string) (string, error) {
@@ -99,19 +100,16 @@ func (service *MatchService) GetServerTime() time.Time {
 	return time.Now()
 }
 
-func (service *MatchService) nameToHeroList(nameList []string) ([]*matches.Hero, error) {
-	heroList := []*matches.Hero{}
-	for _, heroName := range nameList {
+func (service *MatchService) nameToTemplate(heroList []string) ([]matches.HeroTemplate, error) {
+	arr := []matches.HeroTemplate{}
+	for _, heroName := range heroList {
 		template, err := service.templateRepository.GetTemplateFromName(heroName)
 		if err != nil {
 			return nil, err
 		}
-		heroList = append(heroList, &matches.Hero{
-			HeroTemplate: template,
-			Health:       template.GetBaseStats().MaxHealth,
-		})
+		arr = append(arr, template)
 	}
-	return heroList, nil
+	return arr, nil
 }
 
 func NewMatchService() *MatchService {

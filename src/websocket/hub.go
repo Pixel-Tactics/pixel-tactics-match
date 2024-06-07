@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"pixeltactics.com/match/src/data_structures"
 	"pixeltactics.com/match/src/handlers"
 	"pixeltactics.com/match/src/types"
 )
@@ -16,29 +17,29 @@ type PlayerRegistration struct {
 }
 
 type PlayerHub struct {
-	playerIdToClient map[string]*Client // TODO: make sync
-	clientToPlayerId map[*Client]string // TODO: make sync
+	playerIdToClient *data_structures.SyncMap[string, *Client]
+	clientToPlayerId *data_structures.SyncMap[*Client, string]
 }
 
 func (hub *PlayerHub) RegisterPlayer(playerId string, client *Client) {
-	hub.playerIdToClient[playerId] = client
-	hub.clientToPlayerId[client] = playerId
+	hub.playerIdToClient.Store(playerId, client)
+	hub.clientToPlayerId.Store(client, playerId)
 }
 
 func (hub *PlayerHub) UnregisterPlayer(client *Client) {
-	playerId, ok := hub.clientToPlayerId[client]
+	playerId, ok := hub.clientToPlayerId.Load(client)
 	if ok {
-		delete(hub.clientToPlayerId, client)
+		hub.clientToPlayerId.Delete(client)
 	}
-	_, ok = hub.playerIdToClient[playerId]
+	_, ok = hub.playerIdToClient.Load(playerId)
 	if ok {
-		delete(hub.playerIdToClient, playerId)
+		hub.playerIdToClient.Delete(playerId)
 	}
 }
 
 type ClientHub struct {
 	playerHub      *PlayerHub
-	clientList     map[*Client]bool // TODO: make sync
+	clientList     *data_structures.SyncMap[*Client, bool]
 	registerClient chan *Client
 	registerPlayer chan *PlayerRegistration
 	unregister     chan *Client
@@ -46,7 +47,7 @@ type ClientHub struct {
 }
 
 func (hub *ClientHub) GetClientFromPlayerId(playerId string) (*Client, bool) {
-	client, ok := hub.playerHub.playerIdToClient[playerId]
+	client, ok := hub.playerHub.playerIdToClient.Load(playerId)
 	if !ok {
 		return nil, false
 	}
@@ -54,7 +55,7 @@ func (hub *ClientHub) GetClientFromPlayerId(playerId string) (*Client, bool) {
 }
 
 func (hub *ClientHub) GetPlayerIdFromClient(client *Client) (string, bool) {
-	playerId, ok := hub.playerHub.clientToPlayerId[client]
+	playerId, ok := hub.playerHub.clientToPlayerId.Load(client)
 	if !ok {
 		return "", false
 	}
@@ -70,9 +71,9 @@ func (hub *ClientHub) RegisterPlayer(playerId string, client *Client) {
 
 func (hub *ClientHub) UnregisterClient(client *Client) {
 	hub.playerHub.UnregisterPlayer(client)
-	_, ok := hub.clientList[client]
+	_, ok := hub.clientList.Load(client)
 	if ok {
-		delete(hub.clientList, client)
+		hub.clientList.Delete(client)
 		close(client.receive)
 	}
 }
@@ -88,7 +89,7 @@ func (hub *ClientHub) Run() {
 	for {
 		select {
 		case client := <-hub.registerClient:
-			hub.clientList[client] = true
+			hub.clientList.Store(client, true)
 		case register := <-hub.registerPlayer:
 			hub.playerHub.RegisterPlayer(register.playerId, register.client)
 		case client := <-hub.unregister:
@@ -139,15 +140,15 @@ func (hub *ClientHub) Run() {
 
 func NewClientHub() *ClientHub {
 	playerHub := &PlayerHub{
-		playerIdToClient: make(map[string]*Client),
-		clientToPlayerId: make(map[*Client]string),
+		playerIdToClient: data_structures.NewSyncMap[string, *Client](),
+		clientToPlayerId: data_structures.NewSyncMap[*Client, string](),
 	}
 	return &ClientHub{
 		playerHub:      playerHub,
-		clientList:     make(map[*Client]bool),
-		registerClient: make(chan *Client),
-		registerPlayer: make(chan *PlayerRegistration),
-		unregister:     make(chan *Client),
-		message:        make(chan *MessageWithClient),
+		clientList:     data_structures.NewSyncMap[*Client, bool](),
+		registerClient: make(chan *Client, 256),
+		registerPlayer: make(chan *PlayerRegistration, 256),
+		unregister:     make(chan *Client, 256),
+		message:        make(chan *MessageWithClient, 256),
 	}
 }

@@ -8,22 +8,26 @@ const (
 )
 
 type Point struct {
-	x int
-	y int
+	X int `json:"x"`
+	Y int `json:"y"`
 }
 
 func (p Point) Add(q Point) Point {
-	return Point{x: p.x + q.x, y: p.y + q.y}
+	return Point{X: p.X + q.X, Y: p.Y + q.Y}
+}
+
+func (p Point) Equals(o Point) bool {
+	return p.X == o.X && p.Y == o.Y
 }
 
 func GetPointFromDirection(dir string) Point {
 	if dir == DIRECTION_UP {
-		return Point{x: 0, y: -1}
+		return Point{X: 0, Y: -1}
 	} else if dir == DIRECTION_DOWN {
-		return Point{x: 0, y: 1}
+		return Point{X: 0, Y: 1}
 	} else if dir == DIRECTION_LEFT {
-		return Point{x: -1, y: 0}
+		return Point{X: -1, Y: 0}
 	} else {
-		return Point{x: 1, y: 0}
+		return Point{X: 1, Y: 0}
 	}
 }

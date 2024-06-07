@@ -6,9 +6,11 @@ import (
 	"github.com/google/uuid"
 	"pixeltactics.com/match/src/data_structures"
 	"pixeltactics.com/match/src/matches"
+	"pixeltactics.com/match/src/notifiers"
 )
 
 type SessionRepository struct {
+	notifier      notifiers.SessionNotifier
 	sessions      *data_structures.SyncMap[string, *matches.Session]
 	playerSession *data_structures.SyncMap[string, *matches.Session]
 }

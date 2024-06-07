@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 
+	"pixeltactics.com/match/src/notifiers"
 	"pixeltactics.com/match/src/services"
 	"pixeltactics.com/match/src/types"
 	"pixeltactics.com/match/src/utils"
@@ -93,19 +94,7 @@ func (handler *SessionHandler) PreparePlayer(req *types.Request, res *types.Resp
 		return
 	}
 
-	session, err := handler.matchService.GetPlayerSession(body.PlayerId)
-	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
-		return
-	}
-
-	opponentId, err := handler.matchService.GetOpponentId(body.PlayerId)
-	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
-		return
-	}
-
-	isStarted, err := handler.matchService.PreparePlayer(body)
+	_, err = handler.matchService.PreparePlayer(body)
 	if err != nil {
 		res.SendToClient(utils.ErrorMessage(err))
 		return
@@ -117,21 +106,6 @@ func (handler *SessionHandler) PreparePlayer(req *types.Request, res *types.Resp
 			"success": true,
 		},
 	})
-
-	if isStarted {
-		res.NotifyClient(&types.Message{
-			Action: types.ACTION_START_BATTLE,
-			Body: map[string]interface{}{
-				"session": session,
-			},
-		})
-		res.NotifyOtherClient(opponentId, &types.Message{
-			Action: types.ACTION_START_BATTLE,
-			Body: map[string]interface{}{
-				"session": session,
-			},
-		})
-	}
 }
 
 func (handler *SessionHandler) ExecuteAction(req *types.Request, res *types.Response) {
@@ -142,11 +116,11 @@ func (handler *SessionHandler) ExecuteAction(req *types.Request, res *types.Resp
 		return
 	}
 
-	opponentId, err := handler.matchService.GetOpponentId(body.PlayerId)
-	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
-		return
-	}
+	// opponentId, err := handler.matchService.GetOpponentId(body.PlayerId)
+	// if err != nil {
+	// 	res.SendToClient(utils.ErrorMessage(err))
+	// 	return
+	// }
 
 	err = handler.matchService.ExecuteAction(body)
 	if err != nil {
@@ -154,22 +128,40 @@ func (handler *SessionHandler) ExecuteAction(req *types.Request, res *types.Resp
 		return
 	}
 
-	res.SendToClient(&types.Message{
-		Action:     types.ACTION_FEEDBACK,
-		Identifier: req.Message.Identifier,
-		Body: map[string]interface{}{
-			"Success": true,
-		},
-	})
+	// res.NotifyClient(&types.Message{
+	// 	Action: types.ACTION_APPLY_ACTION,
+	// 	Body: map[string]interface{}{
+	// 		"actionName":     body.ActionName,
+	// 		"actionSpecific": body.ActionSpecific,
+	// 	},
+	// })
 
-	res.NotifyOtherClient(opponentId, &types.Message{
-		Action:     types.ACTION_ENEMY_ACTION,
-		Identifier: req.Message.Identifier,
-		Body: map[string]interface{}{
-			"ActionName": body.ActionName,
-			"Action":     body.ActionSpecific,
-		},
-	})
+	// res.NotifyOtherClient(opponentId, &types.Message{
+	// 	Action: types.ACTION_APPLY_ACTION,
+	// 	Body: map[string]interface{}{
+	// 		"actionName":     body.ActionName,
+	// 		"actionSpecific": body.ActionSpecific,
+	// 	},
+	// })
+}
+
+func (handler *SessionHandler) EndTurn(req *types.Request, res *types.Response) {
+	playerIdInterface, ok := req.Message.Body["playerId"]
+	if !ok {
+		res.SendToClient(utils.ErrorMessage(errors.New("no player id")))
+		return
+	}
+	playerId, ok := playerIdInterface.(string)
+	if !ok {
+		res.SendToClient(utils.ErrorMessage(errors.New("player id must be a string")))
+		return
+	}
+
+	err := handler.matchService.EndTurn(playerId)
+	if err != nil {
+		res.SendToClient(utils.ErrorMessage(err))
+		return
+	}
 }
 
 func (handler *SessionHandler) GetServerTime(req *types.Request, res *types.Response) {
@@ -198,7 +190,33 @@ func (handler *SessionHandler) Run() {
 				handler.GetServerTime(req, res)
 			} else if req.Message.Action == types.ACTION_PREPARE_PLAYER {
 				handler.PreparePlayer(req, res)
+			} else if req.Message.Action == types.ACTION_EXECUTE_ACTION {
+				handler.ExecuteAction(req, res)
+			} else if req.Message.Action == types.ACTION_END_TURN {
+				handler.EndTurn(req, res)
 			}
+			handler.handleNotifierChannel(res)
+		}
+	}
+}
+
+func (handler *SessionHandler) handleNotifierChannel(res *types.Response) {
+	notifier := notifiers.GetSessionNotifier()
+	for {
+		isBreak := false
+		select {
+		case msg, ok := <-notifier.SendChannel:
+			if ok {
+				playerId := msg.PlayerId
+				message := msg.Message
+				res.NotifyOtherClient(playerId, &message)
+			}
+		default:
+			isBreak = true
+		}
+
+		if isBreak {
+			break
 		}
 	}
 }
@@ -206,6 +224,6 @@ func (handler *SessionHandler) Run() {
 func NewSessionHandler() *SessionHandler {
 	return &SessionHandler{
 		matchService: *services.NewMatchService(),
-		Interaction:  make(chan *types.Interaction),
+		Interaction:  make(chan *types.Interaction, 256),
 	}
 }

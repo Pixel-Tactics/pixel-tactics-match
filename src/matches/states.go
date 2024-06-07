@@ -14,9 +14,10 @@ const (
 )
 
 type ISessionState interface {
-	preparePlayer(playerId string, chosenHeroList []*Hero) error
+	preparePlayer(playerId string, chosenHeroList []HeroTemplate) error
 	startBattle() error
 	executeAction(action IAction) error
+	endTurn(playerId string) error
 	forfeit(playerId string) error
 	getData() map[string]interface{}
 }
@@ -31,17 +32,20 @@ func (state *PreparationState) executeAction(action IAction) error {
 	return exceptions.ActionNotAllowed()
 }
 
+func (state *PreparationState) endTurn(playerId string) error {
+	return exceptions.ActionNotAllowed()
+}
+
 func (state *PreparationState) forfeit(playerId string) error {
 	return exceptions.ActionNotAllowed()
 }
 
-func (state *PreparationState) preparePlayer(playerId string, chosenHeroList []*Hero) error {
+func (state *PreparationState) preparePlayer(playerId string, chosenHeroList []HeroTemplate) error {
 	if time.Now().After(state.deadline) {
-		state.session.state = &EndState{
+		state.session.changeState(&EndState{
 			session:  state.session,
 			winnerId: "draw",
-		}
-		state.session.processEndResult()
+		})
 		return exceptions.ExceededDeadlineError()
 	}
 
@@ -50,21 +54,25 @@ func (state *PreparationState) preparePlayer(playerId string, chosenHeroList []*
 		return errors.New("invalid player id")
 	}
 
+	heroList := []*Hero{}
+	for _, template := range chosenHeroList {
+		heroList = append(heroList, NewHero(template, player))
+	}
+
 	if len(chosenHeroList) != numberOfHero {
 		return errors.New("invalid number of heroes")
 	}
 
-	player.HeroList = chosenHeroList
+	player.HeroList = heroList
 	return nil
 }
 
 func (state *PreparationState) startBattle() error {
 	if time.Now().After(state.deadline) {
-		state.session.state = &EndState{
+		state.session.changeState(&EndState{
 			session:  state.session,
 			winnerId: "draw",
-		}
-		state.session.processEndResult()
+		})
 		return exceptions.ExceededDeadlineError()
 	}
 
@@ -74,10 +82,30 @@ func (state *PreparationState) startBattle() error {
 		return exceptions.HeroPickupError()
 	}
 
-	state.session.state = &Player1TurnState{
+	mapStructure := state.session.matchMap.Structure
+	if len(mapStructure) == 0 {
+		return errors.New("invalid map structure")
+	}
+
+	cnt1 := 0
+	cnt2 := 0
+	for i := range mapStructure {
+		for j := range mapStructure[0] {
+			if mapStructure[i][j] == 3 && cnt1 < len(heroList1) {
+				heroList1[cnt1].Pos = Point{X: j, Y: i}
+				cnt1 += 1
+			} else if mapStructure[i][j] == 4 && cnt2 < len(heroList2) {
+				heroList2[cnt2].Pos = Point{X: j, Y: i}
+				cnt2 += 1
+			}
+		}
+	}
+
+	state.session.changeState(&Player1TurnState{
 		session:  state.session,
 		deadline: state.deadline.Add(playerTurnTime),
-	}
+	})
+
 	return nil
 }
 
@@ -96,10 +124,10 @@ type Player1TurnState struct {
 
 func (state *Player1TurnState) executeAction(action IAction) error {
 	if time.Now().After(state.deadline) {
-		state.session.state = &Player2TurnState{
+		state.session.changeState(&Player2TurnState{
 			session:  state.session,
 			deadline: state.deadline.Add(playerTurnTime),
-		}
+		})
 		return exceptions.ExceededDeadlineError()
 	}
 
@@ -117,43 +145,57 @@ func (state *Player1TurnState) executeAction(action IAction) error {
 
 	winnerId := state.session.checkWinner()
 	if winnerId != "" {
-		state.session.state = &EndState{
+		state.session.changeState(&EndState{
 			session:  state.session,
 			winnerId: winnerId,
-		}
-		state.session.processEndResult()
-	} else {
-		state.session.state = &Player2TurnState{
+		})
+		return nil
+	}
+
+	hasAction := state.session.player1.hasAvailableAction()
+	if !hasAction {
+		state.session.changeState(&Player2TurnState{
 			session:  state.session,
 			deadline: state.deadline.Add(playerTurnTime),
-		}
+		})
 	}
 
 	return nil
+}
+
+func (state *Player1TurnState) endTurn(playerId string) error {
+	if state.session.player1.Id == playerId {
+		state.session.changeState(&Player2TurnState{
+			session:  state.session,
+			deadline: state.deadline.Add(playerTurnTime),
+		})
+		return nil
+	} else {
+		return exceptions.ActionNotAllowed()
+	}
 }
 
 func (state *Player1TurnState) forfeit(playerId string) error {
 	if state.session.player1.Id == playerId {
-		state.session.state = &EndState{
+		state.session.changeState(&EndState{
 			session:  state.session,
 			winnerId: state.session.player2.Id,
-		}
+		})
 	} else {
-		state.session.state = &EndState{
+		state.session.changeState(&EndState{
 			session:  state.session,
 			winnerId: state.session.player1.Id,
-		}
+		})
 	}
-	state.session.processEndResult()
 	return nil
 }
 
-func (state *Player1TurnState) preparePlayer(playerId string, chosenHeroList []*Hero) error {
-	panic("unimplemented")
+func (state *Player1TurnState) preparePlayer(playerId string, chosenHeroList []HeroTemplate) error {
+	return exceptions.ActionNotAllowed()
 }
 
 func (state *Player1TurnState) startBattle() error {
-	panic("unimplemented")
+	return exceptions.ActionNotAllowed()
 }
 
 func (state *Player1TurnState) getData() map[string]interface{} {
@@ -171,10 +213,10 @@ type Player2TurnState struct {
 
 func (state *Player2TurnState) executeAction(action IAction) error {
 	if time.Now().After(state.deadline) {
-		state.session.state = &Player1TurnState{
+		state.session.changeState(&Player1TurnState{
 			session:  state.session,
 			deadline: state.deadline.Add(playerTurnTime),
-		}
+		})
 		return exceptions.ExceededDeadlineError()
 	}
 
@@ -192,43 +234,57 @@ func (state *Player2TurnState) executeAction(action IAction) error {
 
 	winnerId := state.session.checkWinner()
 	if winnerId != "" {
-		state.session.state = &EndState{
+		state.session.changeState(&EndState{
 			session:  state.session,
 			winnerId: winnerId,
-		}
-		state.session.processEndResult()
-	} else {
-		state.session.state = &Player1TurnState{
+		})
+		return nil
+	}
+
+	hasAction := state.session.player1.hasAvailableAction()
+	if !hasAction {
+		state.session.changeState(&Player1TurnState{
 			session:  state.session,
 			deadline: state.deadline.Add(playerTurnTime),
-		}
+		})
 	}
 
 	return nil
+}
+
+func (state *Player2TurnState) endTurn(playerId string) error {
+	if state.session.player2.Id == playerId {
+		state.session.changeState(&Player1TurnState{
+			session:  state.session,
+			deadline: state.deadline.Add(playerTurnTime),
+		})
+		return nil
+	} else {
+		return exceptions.ActionNotAllowed()
+	}
 }
 
 func (state *Player2TurnState) forfeit(playerId string) error {
 	if state.session.player1.Id == playerId {
-		state.session.state = &EndState{
+		state.session.changeState(&EndState{
 			session:  state.session,
 			winnerId: state.session.player2.Id,
-		}
+		})
 	} else {
-		state.session.state = &EndState{
+		state.session.changeState(&EndState{
 			session:  state.session,
 			winnerId: state.session.player1.Id,
-		}
+		})
 	}
-	state.session.processEndResult()
 	return nil
 }
 
-func (state *Player2TurnState) preparePlayer(playerId string, chosenHeroList []*Hero) error {
-	panic("unimplemented")
+func (state *Player2TurnState) preparePlayer(playerId string, chosenHeroList []HeroTemplate) error {
+	return exceptions.ActionNotAllowed()
 }
 
 func (state *Player2TurnState) startBattle() error {
-	panic("unimplemented")
+	return exceptions.ActionNotAllowed()
 }
 
 func (state *Player2TurnState) getData() map[string]interface{} {
@@ -248,11 +304,15 @@ func (state *EndState) executeAction(action IAction) error {
 	return exceptions.ActionNotAllowed()
 }
 
+func (state *EndState) endTurn(playerId string) error {
+	return exceptions.ActionNotAllowed()
+}
+
 func (state *EndState) forfeit(playerId string) error {
 	return exceptions.ActionNotAllowed()
 }
 
-func (state *EndState) preparePlayer(playerId string, chosenHeroList []*Hero) error {
+func (state *EndState) preparePlayer(playerId string, chosenHeroList []HeroTemplate) error {
 	return exceptions.ActionNotAllowed()
 }
 

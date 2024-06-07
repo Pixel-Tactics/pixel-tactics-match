@@ -21,6 +21,9 @@ const (
 	ACTION_FEEDBACK       MessageAction = "FEEDBACK"
 	ACTION_ENEMY_ACTION   MessageAction = "ENEMY_ACTION"
 	ACTION_START_BATTLE   MessageAction = "START_BATTLE"
+	ACTION_EXECUTE_ACTION MessageAction = "EXECUTE_ACTION"
+	ACTION_APPLY_ACTION   MessageAction = "APPLY_ACTION"
+	ACTION_END_TURN       MessageAction = "END_TURN"
 )
 
 type Message struct {

@@ -5,56 +5,10 @@ import (
 	"log"
 	"sync"
 	"time"
+
+	"pixeltactics.com/match/src/notifiers"
+	"pixeltactics.com/match/src/utils"
 )
-
-// 0 = Background
-// 1 = Land
-// 2 = Spawn
-// 3 = Obstacle
-type MatchMap struct {
-	Structure [][]int `json:"structure"`
-}
-
-func (m *MatchMap) IsPointOpen(pos Point) bool {
-	curValue := m.Structure[pos.x][pos.y]
-	return curValue == 1 || curValue == 2
-}
-
-type Hero struct {
-	Health         int   `json:"health"`
-	Pos            Point `json:"pos"`
-	lastMoveTurn   int   `json:"lastMoveTurn"`
-	lastAttackTurn int   `json:"lastAttackTurn"`
-	HeroTemplate   `json:"template"`
-}
-
-func (h *Hero) canMove(currentTurn int) bool {
-	if h.lastAttackTurn >= currentTurn {
-		return false
-	} else if h.lastMoveTurn >= currentTurn {
-		return false
-	} else {
-		return true
-	}
-}
-
-func (h *Hero) canAttack(currentTurn int) bool {
-	return h.lastAttackTurn < currentTurn
-}
-
-type Player struct {
-	Id       string  `json:"id"`
-	HeroList []*Hero `json:"heroList"`
-}
-
-func (p *Player) IsHeroExists(hero *Hero) bool {
-	for _, curHero := range p.HeroList {
-		if hero == curHero {
-			return true
-		}
-	}
-	return false
-}
 
 type Session struct {
 	id                string
@@ -66,7 +20,7 @@ type Session struct {
 	matchMap          *MatchMap
 	availableHeroList []string
 	actionLog         []IAction
-	lock              sync.Mutex
+	lock              *sync.Mutex
 }
 
 /* No Mutex Methods */
@@ -105,12 +59,12 @@ func (session *Session) getHeroOnPlayer(playerId string, heroName string) (*Hero
 
 func (session *Session) isPointOpen(pos Point) bool {
 	for _, hero := range session.player1.HeroList {
-		if hero.Pos == pos {
+		if hero.Pos.Equals(pos) {
 			return false
 		}
 	}
 	for _, hero := range session.player2.HeroList {
-		if hero.Pos == pos {
+		if hero.Pos.Equals(pos) {
 			return false
 		}
 	}
@@ -139,8 +93,95 @@ func (session *Session) checkWinner() string {
 	return ""
 }
 
+func (session *Session) getLastAction() (IAction, bool) {
+	if len(session.actionLog) == 0 {
+		return nil, false
+	}
+	return session.actionLog[len(session.actionLog)-1], true
+}
+
 func (session *Session) processEndResult() {
 	log.Println("match " + session.id + " completed")
+}
+
+func (session *Session) createActionLog(actionName string, actionBody map[string]interface{}) (IAction, error) {
+	if actionName == "move" {
+		var action MoveLogData
+		err := utils.MapToObject(actionBody, &action)
+		if err != nil {
+			return nil, err
+		}
+
+		hero, err := session.getHeroOnPlayer(action.PlayerId, action.HeroName)
+		if err != nil {
+			return nil, err
+		}
+
+		return &MoveLog{
+			srcHero:       hero,
+			directionList: action.DirectionList,
+		}, nil
+	} else if actionName == "attack" {
+		var action AttackLogData
+		err := utils.MapToObject(actionBody, &action)
+		if err != nil {
+			return nil, err
+		}
+
+		hero, err := session.getHeroOnPlayer(action.PlayerId, action.HeroName)
+		if err != nil {
+			return nil, err
+		}
+
+		opponent, err := session.getOpponentPlayer(action.PlayerId)
+		if err != nil {
+			return nil, err
+		}
+
+		target, err := session.getHeroOnPlayer(opponent.Id, action.TargetName)
+		if err != nil {
+			return nil, err
+		}
+
+		return &AttackLog{
+			srcHero: hero,
+			trgHero: target,
+		}, nil
+	}
+	return nil, errors.New("invalid action name")
+}
+
+func (session *Session) getData() map[string]interface{} {
+	actionLogData := []map[string]interface{}{}
+	for _, actionLog := range session.actionLog {
+		actionLogData = append(actionLogData, actionLog.getData())
+	}
+	return map[string]interface{}{
+		"id":                session.id,
+		"player1":           session.player1.getData(),
+		"player2":           session.player2.getData(),
+		"state":             session.state.getData(),
+		"availableHeroList": session.availableHeroList,
+		"matchMap":          session.matchMap,
+		"actionLog":         actionLogData,
+	}
+}
+
+func (session *Session) changeState(newState ISessionState) {
+	_, ok1 := session.state.(*Player1TurnState)
+	_, ok2 := session.state.(*Player2TurnState)
+	if ok1 || ok2 {
+		session.currentTurn += 1
+	}
+
+	session.state = newState
+	notifier := notifiers.GetSessionNotifier()
+	notifier.NotifyChangeState(session.player1.Id, session.getData())
+	notifier.NotifyChangeState(session.player2.Id, session.getData())
+	_, ok := session.state.(*EndState)
+	if ok {
+		session.processEndResult()
+	}
 }
 
 /* Mutex Methods */
@@ -208,7 +249,7 @@ func (session *Session) GetAvailableHeroes() []string {
 	return session.availableHeroList
 }
 
-func (session *Session) PreparePlayer(playerId string, chosenHeroList []*Hero) error {
+func (session *Session) PreparePlayer(playerId string, chosenHeroList []HeroTemplate) error {
 	session.lock.Lock()
 	defer session.lock.Unlock()
 	return session.state.preparePlayer(playerId, chosenHeroList)
@@ -220,10 +261,28 @@ func (session *Session) StartBattle() error {
 	return session.state.startBattle()
 }
 
-func (session *Session) ExecuteAction(action IAction) error {
+func (session *Session) ExecuteAction(actionName string, actionBody map[string]interface{}) error {
 	session.lock.Lock()
 	defer session.lock.Unlock()
-	return session.state.executeAction(action)
+	action, err := session.createActionLog(actionName, actionBody)
+	if err != nil {
+		return err
+	}
+	err = session.state.executeAction(action)
+	if err != nil {
+		return err
+	}
+
+	notifier := notifiers.GetSessionNotifier()
+	notifier.NotifyAction(session.player1.Id, action.getName(), action.getData())
+	notifier.NotifyAction(session.player2.Id, action.getName(), action.getData())
+	return nil
+}
+
+func (session *Session) EndTurn(playerId string) error {
+	session.lock.Lock()
+	defer session.lock.Unlock()
+	return session.state.endTurn(playerId)
 }
 
 func (session *Session) Forfeit(playerId string) error {
@@ -235,52 +294,20 @@ func (session *Session) Forfeit(playerId string) error {
 func (session *Session) GetData() map[string]interface{} {
 	session.lock.Lock()
 	defer session.lock.Unlock()
-	return map[string]interface{}{
-		"id":                session.id,
-		"player1":           session.player1,
-		"player2":           session.player2,
-		"state":             session.state.getData(),
-		"availableHeroList": session.availableHeroList,
-		"matchMap":          session.matchMap,
-		// "actionLog":         session.actionLog,
-	}
+	return session.getData()
 }
 
 func NewSession(sessionId string, player1Id string, player2Id string, matchMap *MatchMap, availableHeroList []string) *Session {
-	player1 := &Player{
-		Id:       player1Id,
-		HeroList: []*Hero{},
-	}
-	player2 := &Player{
-		Id:       player2Id,
-		HeroList: []*Hero{},
-	}
 	newMatchMap := matchMap
 	newAvailableHeroList := availableHeroList
-	return &Session{
+	session := &Session{
 		id:                sessionId,
-		player1:           player1,
-		player2:           player2,
 		running:           false,
 		matchMap:          newMatchMap,
 		availableHeroList: newAvailableHeroList,
+		lock:              new(sync.Mutex),
 	}
-}
-
-func GenerateMap() (*MatchMap, error) {
-	structure := [][]int{
-		{1, 1, 1, 1, 1},
-		{1, 2, 2, 1, 1},
-		{1, 1, 1, 1, 1},
-		{1, 1, 2, 2, 1},
-		{1, 1, 1, 1, 1},
-	}
-	newMap := MatchMap{
-		Structure: structure,
-	}
-	return &newMap, nil
-}
-
-func GetAvailableHeroes() ([]string, error) {
-	return []string{"knight"}, nil
+	session.player1 = NewPlayer(player1Id, session)
+	session.player2 = NewPlayer(player2Id, session)
+	return session
 }
