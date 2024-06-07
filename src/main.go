@@ -1,12 +1,21 @@
 package main
 
 import (
+	"log"
+
 	ws "pixeltactics.com/match/src/websocket"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("Error in loading .env file")
+		return
+	}
+
 	clientHub := ws.NewClientHub()
 	go clientHub.Run()
 
@@ -16,5 +25,5 @@ func main() {
 		ws.ServeWebSocket(clientHub, context.Writer, context.Request)
 	})
 
-	router.Run("127.0.0.1:8080")
+	router.Run("localhost:8000")
 }
