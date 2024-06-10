@@ -5,16 +5,16 @@
 This is the match microservice of Pixel Tactics. This service focuses on handling game matches such as match invitation, heroes pickup, turn-based gameplay, etc.
 
 ## Installing
-First, you need to install dependencies.
+First, you need to setup the environment variables. You can create `.env` file in the root directory to do this step. Below are the required envs:
+- `USER_MICROSERVICE_URL`: URL for user microservice deployment. Example: `http://localhost:8080` for local development and `https://users.deployment-website.com`.
+- `RABBITMQ_CONNECTION_STRING`: Connection string for RabbitMQ in the format of `amqp://USERNAME:PASSWORD@HOST:PORT/`. Example: `amqp://guest:guest@localhost:5672/`.
+
+After setting up the environment variables, you need to install dependencies.
 ```
 go mod tidy
 ```
 
-After installing the dependencies, setup the environment variables. You can also use `.env` file in order to do this step. Below are the required envs:
-- `USER_MICROSERVICE_URL`: URL for user microservice deployment. Example: `http://localhost:8080` for local development and `https://users.deployment-website.com`.
-- `RABBITMQ_CONNECTION_STRING`: Connection string for RabbitMQ in the format of `amqp://USERNAME:PASSWORD@HOST:PORT/`. Example: `amqp://guest:guest@localhost:5672/`.
-
-Before running, ensure that the User Microservice and RabbitMQ server is active. To run this service, run:
+Ensure that the User Microservice and RabbitMQ server are active. Then, to run this service, run:
 ```
 go run src/main.go
 ```
