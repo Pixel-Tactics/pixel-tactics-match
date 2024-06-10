@@ -1,11 +1,13 @@
 package matches
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
 	"sync"
 	"time"
 
+	"pixeltactics.com/match/src/messaging"
 	"pixeltactics.com/match/src/notifiers"
 	"pixeltactics.com/match/src/utils"
 )
@@ -101,6 +103,28 @@ func (session *Session) getLastAction() (IAction, bool) {
 }
 
 func (session *Session) processEndResult() {
+	winner := session.checkWinner()
+	if winner == "" {
+		return
+	}
+
+	body := map[string]interface{}{
+		"username1":  session.player1.Id,
+		"username2":  session.player2.Id,
+		"isUser1Win": (winner == session.player1.Id),
+	}
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		panic("invalid format on process end result json")
+	}
+
+	publisher := messaging.GetPublisher()
+	publisher.Publish(&messaging.PublisherMessage{
+		Exchange:   "matches",
+		RoutingKey: "users",
+		Body:       string(encoded),
+	})
+
 	log.Println("match " + session.id + " completed")
 }
 

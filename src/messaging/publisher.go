@@ -57,20 +57,18 @@ func createConnection() (*amqp.Connection, *amqp.Channel, error) {
 	return conn, ch, nil
 }
 
-func newPublisher() (*Publisher, error) {
+func newPublisher() *Publisher {
 	publisher := &Publisher{
 		conn:     nil,
 		chann:    nil,
 		waitList: make(chan *PublisherMessage, 256),
 	}
-	log.Println("NEWING")
 	go func() {
 		defer func() {
 			publisher.close()
 		}()
 
 		for {
-			log.Println("HUWOHH")
 			msg, ok := <-publisher.waitList
 			if ok {
 				publisher.ensureConnection()
@@ -95,22 +93,17 @@ func newPublisher() (*Publisher, error) {
 			}
 		}
 	}()
-	return publisher, nil
+	return publisher
 }
 
 var publisher *Publisher = nil
 var lock *sync.Mutex = new(sync.Mutex)
 
-func GetPublisher() (*Publisher, error) {
+func GetPublisher() *Publisher {
 	lock.Lock()
 	defer lock.Unlock()
 	if publisher == nil {
-		pub, err := newPublisher()
-		if err != nil {
-			return nil, err
-		}
-		publisher = pub
-		return publisher, nil
+		publisher = newPublisher()
 	}
-	return publisher, nil
+	return publisher
 }
