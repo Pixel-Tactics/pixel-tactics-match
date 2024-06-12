@@ -114,10 +114,7 @@ func (handler *AuthHandler) sendAuthRequest(playerToken string, res *types.Respo
 			sendError()
 		}
 
-		log.Println("GOT RESPONSE")
-
 		if resp.StatusCode == 200 {
-			log.Println("RESPONSE 200")
 			jsonBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				sendError()
@@ -142,7 +139,6 @@ func (handler *AuthHandler) sendAuthRequest(playerToken string, res *types.Respo
 				Response: res,
 			}
 		} else {
-			log.Println("RESPONSE ERR")
 			sendError()
 		}
 	}()
@@ -164,10 +160,8 @@ func (handler *AuthHandler) Run() {
 				handler.AuthenticateClient(interaction.Request, interaction.Response)
 			}
 		case successResp := <-handler.successResponses:
-			log.Println("TEST")
 			handler.handleSuccess(successResp.Request, successResp.Response)
 		case errorResp := <-handler.errorResponses:
-			log.Println("TOWST")
 			handler.handleError(errorResp.Request, errorResp.Response)
 		}
 	}

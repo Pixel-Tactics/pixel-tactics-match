@@ -103,6 +103,7 @@ func (session *Session) getLastAction() (IAction, bool) {
 }
 
 func (session *Session) processEndResult() {
+	session.running = false
 	winner := session.checkWinner()
 	if winner == "" {
 		return
@@ -199,13 +200,14 @@ func (session *Session) changeState(newState ISessionState) {
 	}
 
 	session.state = newState
-	notifier := notifiers.GetSessionNotifier()
-	notifier.NotifyChangeState(session.player1.Id, session.getData())
-	notifier.NotifyChangeState(session.player2.Id, session.getData())
 	_, ok := session.state.(*EndState)
 	if ok {
 		session.processEndResult()
 	}
+
+	notifier := notifiers.GetSessionNotifier()
+	notifier.NotifyChangeState(session.player1.Id, session.getData())
+	notifier.NotifyChangeState(session.player2.Id, session.getData())
 }
 
 /* Mutex Methods */
@@ -313,6 +315,12 @@ func (session *Session) Forfeit(playerId string) error {
 	session.lock.Lock()
 	defer session.lock.Unlock()
 	return session.state.forfeit(playerId)
+}
+
+func (session *Session) GetId() string {
+	session.lock.Lock()
+	defer session.lock.Unlock()
+	return session.id
 }
 
 func (session *Session) GetData() map[string]interface{} {

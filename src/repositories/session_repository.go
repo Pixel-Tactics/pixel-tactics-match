@@ -6,11 +6,9 @@ import (
 	"github.com/google/uuid"
 	"pixeltactics.com/match/src/data_structures"
 	"pixeltactics.com/match/src/matches"
-	"pixeltactics.com/match/src/notifiers"
 )
 
 type SessionRepository struct {
-	notifier      notifiers.SessionNotifier
 	sessions      *data_structures.SyncMap[string, *matches.Session]
 	playerSession *data_structures.SyncMap[string, *matches.Session]
 }
@@ -36,7 +34,11 @@ func (repo *SessionRepository) CreateSession(playerId string, opponentId string)
 	if isPlayerInSession {
 		sessionOpponent, _ := playerSession.GetOpponentPlayerSync(playerId)
 		if sessionOpponent.Id != opponentId {
-			return nil, errors.New("player is already on a session with another player")
+			if playerSession.GetRunning() {
+				return nil, errors.New("player is already on a session with another player")
+			} else {
+				repo.DeleteSession(playerSession.GetId())
+			}
 		} else {
 			return nil, errors.New("session is already created")
 		}
@@ -84,8 +86,15 @@ func (repo *SessionRepository) DeleteSession(sessionId string) {
 	}
 
 	player1Id, player2Id := session.GetPlayers()
-	repo.playerSession.Delete(player1Id)
-	repo.playerSession.Delete(player2Id)
+	session1, ok1 := repo.playerSession.Load(player1Id)
+	if ok1 && session1 == session {
+		repo.playerSession.Delete(player1Id)
+	}
+	session2, ok2 := repo.playerSession.Load(player2Id)
+	if ok2 && session2 == session {
+		repo.playerSession.Delete(player2Id)
+	}
+
 	repo.sessions.Delete(sessionId)
 }
 
