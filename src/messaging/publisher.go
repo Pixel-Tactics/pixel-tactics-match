@@ -81,7 +81,7 @@ func newPublisher() *Publisher {
 					true,
 					false,
 					amqp.Publishing{
-						ContentType: "text/plain",
+						ContentType: "application/json",
 						Body:        []byte(msg.Body),
 					},
 				)

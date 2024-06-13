@@ -241,7 +241,7 @@ func (state *Player2TurnState) executeAction(action IAction) error {
 		return nil
 	}
 
-	hasAction := state.session.player1.hasAvailableAction()
+	hasAction := state.session.player2.hasAvailableAction()
 	if !hasAction {
 		state.session.changeState(&Player1TurnState{
 			session:  state.session,
@@ -322,6 +322,7 @@ func (state *EndState) startBattle() error {
 
 func (state *EndState) getData() map[string]interface{} {
 	return map[string]interface{}{
-		"name": "END",
+		"name":     "END",
+		"winnerId": state.winnerId,
 	}
 }

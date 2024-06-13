@@ -74,23 +74,23 @@ func (session *Session) isPointOpen(pos Point) bool {
 }
 
 func (session *Session) checkWinner() string {
-	cnt := 0
+	cntDead := 0
 	for _, hero := range session.player1.HeroList {
 		if hero.Health == 0 {
-			cnt++
+			cntDead++
 		}
 	}
-	if cnt == len(session.player1.HeroList) {
-		return session.player1.Id
+	if cntDead == len(session.player1.HeroList) {
+		return session.player2.Id
 	}
-	cnt = 0
+	cntDead = 0
 	for _, hero := range session.player2.HeroList {
 		if hero.Health == 0 {
-			cnt++
+			cntDead++
 		}
 	}
-	if cnt == len(session.player2.HeroList) {
-		return session.player2.Id
+	if cntDead == len(session.player2.HeroList) {
+		return session.player1.Id
 	}
 	return ""
 }
@@ -110,6 +110,7 @@ func (session *Session) processEndResult() {
 	}
 
 	body := map[string]interface{}{
+		"matchId":    session.id,
 		"username1":  session.player1.Id,
 		"username2":  session.player2.Id,
 		"isUser1Win": (winner == session.player1.Id),
