@@ -1,6 +1,8 @@
 package services
 
-import "pixeltactics.com/match/src/matches"
+import (
+	matches_maps "pixeltactics.com/match/src/matches/maps"
+)
 
 type CreateSessionRequestDTO struct {
 	PlayerId   string `json:"playerId"`
@@ -12,8 +14,8 @@ type GetSessionRequestDTO struct {
 }
 
 type GetSessionResponseDTO struct {
-	MatchMap          matches.MatchMap `json:"map"`
-	AvailableHeroList []string         `json:"available"`
+	MatchMap          matches_maps.MatchMap `json:"map"`
+	AvailableHeroList []string              `json:"available"`
 }
 
 type PreparePlayerRequestDTO struct {

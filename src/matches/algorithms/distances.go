@@ -1,17 +1,19 @@
-package matches
+package matches_algorithms
 
 import (
 	"errors"
 
 	llq "github.com/emirpasic/gods/queues/linkedlistqueue"
+
+	physics "pixeltactics.com/match/src/matches/physics"
 )
 
 type BFSElement struct {
-	point Point
+	point physics.Point
 	dist  int
 }
 
-func checkDistanceValidity(mp [][]int, src Point, dest Point) error {
+func checkDistanceValidity(mp [][]int, src physics.Point, dest physics.Point) error {
 	if len(mp) == 0 || len(mp[0]) == 0 {
 		return errors.New("invalid map structure")
 	}
@@ -44,12 +46,12 @@ func enqueueIfAvailable(queue *llq.Queue, mp [][]int, visited [][]bool, x int, y
 
 	visited[y][x] = true
 	queue.Enqueue(BFSElement{
-		point: Point{X: x, Y: y},
+		point: physics.Point{X: x, Y: y},
 		dist:  dist,
 	})
 }
 
-func CheckDistance(mp [][]int, src Point, dest Point) (int, error) {
+func CheckDistance(mp [][]int, src physics.Point, dest physics.Point) (int, error) {
 	err := checkDistanceValidity(mp, src, dest)
 	if err != nil {
 		return 0, nil

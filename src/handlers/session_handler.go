@@ -60,7 +60,7 @@ func (handler *SessionHandler) CreateSession(req *types.Request, res *types.Resp
 		},
 	})
 
-	if !session.GetRunning() {
+	if !session.GetRunningSync() {
 		res.NotifyOtherClient(body.OpponentId, &types.Message{
 			Action: types.ACTION_INVITE_SESSION,
 			Body: map[string]interface{}{
@@ -68,7 +68,7 @@ func (handler *SessionHandler) CreateSession(req *types.Request, res *types.Resp
 			},
 		})
 	} else {
-		sessionMap := session.GetData()
+		sessionMap := session.GetDataSync()
 		res.NotifyOtherClient(body.OpponentId, &types.Message{
 			Action: types.ACTION_START_SESSION,
 			Body: map[string]interface{}{

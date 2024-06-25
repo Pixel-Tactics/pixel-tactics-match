@@ -1,4 +1,6 @@
-package matches
+package matches_maps
+
+import matches_physics "pixeltactics.com/match/src/matches/physics"
 
 // 0 = Background
 // 1 = Land
@@ -9,7 +11,7 @@ type MatchMap struct {
 	Structure [][]int `json:"structure"`
 }
 
-func (m *MatchMap) IsPointOpen(pos Point) bool {
+func (m *MatchMap) IsPointOpen(pos matches_physics.Point) bool {
 	curValue := m.Structure[pos.Y][pos.X]
 	return curValue != 2
 }

@@ -5,6 +5,7 @@ import (
 
 	"pixeltactics.com/match/src/exceptions"
 	"pixeltactics.com/match/src/matches"
+	matches_interfaces "pixeltactics.com/match/src/matches/interfaces"
 	"pixeltactics.com/match/src/repositories"
 )
 
@@ -30,7 +31,7 @@ func (service *MatchService) GetSession(data GetSessionRequestDTO) (map[string]i
 		return nil, exceptions.SessionNotFound()
 	}
 
-	return session.GetData(), nil
+	return session.GetDataSync(), nil
 }
 
 func (service *MatchService) GetPlayerSession(playerId string) (map[string]interface{}, error) {
@@ -39,7 +40,7 @@ func (service *MatchService) GetPlayerSession(playerId string) (map[string]inter
 		return nil, exceptions.SessionNotFound()
 	}
 
-	return session.GetData(), nil
+	return session.GetDataSync(), nil
 }
 
 func (service *MatchService) PreparePlayer(data PreparePlayerRequestDTO) (bool, error) {
@@ -53,12 +54,12 @@ func (service *MatchService) PreparePlayer(data PreparePlayerRequestDTO) (bool, 
 		return false, err
 	}
 
-	err = session.PreparePlayer(data.PlayerId, chosenHeroList)
+	err = session.PreparePlayerSync(data.PlayerId, chosenHeroList)
 	if err != nil {
 		return false, err
 	}
 
-	err = session.StartBattle()
+	err = session.StartBattleSync()
 	if err != nil && err.Error() == exceptions.HeroPickupError().Error() {
 		return false, nil // other player not yet pickup
 	} else if err != nil {
@@ -75,7 +76,7 @@ func (service *MatchService) ExecuteAction(data ExecuteActionRequestDTO) error {
 	}
 
 	data.ActionSpecific["playerId"] = data.PlayerId
-	return session.ExecuteAction(data.ActionName, data.ActionSpecific)
+	return session.ExecuteActionSync(data.ActionName, data.ActionSpecific)
 }
 
 func (service *MatchService) EndTurn(playerId string) error {
@@ -84,7 +85,7 @@ func (service *MatchService) EndTurn(playerId string) error {
 		return exceptions.SessionNotFound()
 	}
 
-	return session.EndTurn(playerId)
+	return session.EndTurnSync(playerId)
 }
 
 func (service *MatchService) GetOpponentId(playerId string) (string, error) {
@@ -100,8 +101,8 @@ func (service *MatchService) GetServerTime() time.Time {
 	return time.Now()
 }
 
-func (service *MatchService) nameToTemplate(heroList []string) ([]matches.HeroTemplate, error) {
-	arr := []matches.HeroTemplate{}
+func (service *MatchService) nameToTemplate(heroList []string) ([]matches_interfaces.HeroTemplate, error) {
+	arr := []matches_interfaces.HeroTemplate{}
 	for _, heroName := range heroList {
 		template, err := service.templateRepository.GetTemplateFromName(heroName)
 		if err != nil {
