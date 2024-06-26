@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"errors"
+	"log"
 
 	"github.com/google/uuid"
 	"pixeltactics.com/match/src/data_structures"
@@ -32,30 +33,25 @@ func (repo *SessionRepository) GetSessionByPlayerId(playerId string) *matches.Se
 }
 
 func (repo *SessionRepository) CreateSession(playerId string, opponentId string) (*matches.Session, error) {
-	playerSession, isPlayerInSession := repo.playerSession.Load(playerId)
-	if isPlayerInSession {
-		sessionOpponent, _ := playerSession.GetOpponentPlayerSync(playerId)
-		if sessionOpponent.Id != opponentId {
-			if playerSession.GetRunningSync() {
-				return nil, errors.New("player is already on a session with another player")
-			} else {
-				repo.DeleteSession(playerSession.GetIdSync())
-			}
-		} else {
-			return nil, errors.New("session is already created")
-		}
+	err := repo.checkPlayerSession(playerId, opponentId)
+	if err != nil {
+		return nil, err
 	}
 
-	opponentSession, isOpponentInSession := repo.playerSession.Load(opponentId)
-	if isOpponentInSession {
-		sessionOpponent, _ := opponentSession.GetOpponentPlayerSync(opponentId)
-		if sessionOpponent.Id != playerId {
-			return nil, errors.New("opponent is already on a session with another player")
-		} else {
-			repo.playerSession.Store(playerId, opponentSession)
-			opponentSession.RunSessionSync()
-			return opponentSession, nil
+	isStart, err := repo.checkOpponentSession(playerId, opponentId)
+	if err != nil {
+		return nil, err
+	}
+
+	if isStart {
+		opponentSession, isOpponentInSession := repo.playerSession.Load(opponentId)
+		if !isOpponentInSession {
+			log.Fatalln("session found before but now not")
+			return nil, errors.New("server cannot get opponent session")
 		}
+		repo.playerSession.Store(playerId, opponentSession)
+		opponentSession.RunSessionSync()
+		return opponentSession, nil
 	}
 
 	newSessionId := uuid.New().String()
@@ -98,6 +94,49 @@ func (repo *SessionRepository) DeleteSession(sessionId string) {
 	}
 
 	repo.sessions.Delete(sessionId)
+}
+
+func (repo *SessionRepository) checkPlayerSession(playerId string, opponentId string) error {
+	playerSession, isPlayerInSession := repo.playerSession.Load(playerId)
+	if isPlayerInSession {
+		sessionOpponent, _ := playerSession.GetOpponentPlayerSync(playerId)
+		isRunning := playerSession.GetRunningSync()
+
+		if !isRunning {
+			repo.DeleteSession(playerSession.GetIdSync())
+			return nil
+		} else {
+			if sessionOpponent.Id != opponentId {
+				return errors.New("player is already on a session with another player")
+			} else {
+				return errors.New("session is already created")
+			}
+		}
+	}
+	return nil
+}
+
+func (repo *SessionRepository) checkOpponentSession(playerId string, opponentId string) (bool, error) {
+	opponentSession, isOpponentInSession := repo.playerSession.Load(opponentId)
+	if isOpponentInSession {
+		sessionOpponent, _ := opponentSession.GetOpponentPlayerSync(opponentId)
+		isRunning := opponentSession.GetRunningSync()
+		isEnded := opponentSession.GetEndedSync()
+
+		if isEnded {
+			repo.DeleteSession(opponentSession.GetIdSync())
+			return false, nil
+		} else if isRunning {
+			if sessionOpponent.Id != playerId {
+				return false, errors.New("opponent is already on a session with another player")
+			} else {
+				return false, errors.New("session is already created")
+			}
+		} else {
+			return sessionOpponent.Id == playerId, nil
+		}
+	}
+	return false, nil
 }
 
 var sessionRepository *SessionRepository = nil
