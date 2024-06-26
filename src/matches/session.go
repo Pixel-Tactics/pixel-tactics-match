@@ -273,6 +273,13 @@ func (session *Session) GetRunningSync() bool {
 	return session.running
 }
 
+func (session *Session) GetEndedSync() bool {
+	session.lock.Lock()
+	defer session.lock.Unlock()
+	_, ok := session.state.(*EndState)
+	return ok
+}
+
 func (session *Session) GetMatchMapSync() matches_maps.MatchMap {
 	session.lock.Lock()
 	defer session.lock.Unlock()
