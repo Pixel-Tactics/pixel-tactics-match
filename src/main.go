@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"net/http"
 
 	ws "pixeltactics.com/match/src/websocket"
 
@@ -10,20 +10,22 @@ import (
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("Error in loading .env file")
-		return
-	}
+	_ = godotenv.Load()
 
 	clientHub := ws.NewClientHub()
 	go clientHub.Run()
 
 	router := gin.Default()
 
+	router.GET("/", func(context *gin.Context) {
+		context.JSON(http.StatusOK, map[string]string{
+			"message": "match service",
+		})
+	})
+
 	router.GET("/ws", func(context *gin.Context) {
 		ws.ServeWebSocket(clientHub, context.Writer, context.Request)
 	})
 
-	router.Run("localhost:8000")
+	router.Run("0.0.0.0:8000")
 }
