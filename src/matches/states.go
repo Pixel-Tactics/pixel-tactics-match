@@ -5,6 +5,9 @@ import (
 	"time"
 
 	"pixeltactics.com/match/src/exceptions"
+	matches_heroes "pixeltactics.com/match/src/matches/heroes"
+	matches_interfaces "pixeltactics.com/match/src/matches/interfaces"
+	matches_physics "pixeltactics.com/match/src/matches/physics"
 )
 
 const (
@@ -14,9 +17,9 @@ const (
 )
 
 type ISessionState interface {
-	preparePlayer(playerId string, chosenHeroList []HeroTemplate) error
+	preparePlayer(playerId string, chosenHeroList []matches_interfaces.HeroTemplate) error
 	startBattle() error
-	executeAction(action IAction) error
+	executeAction(action matches_interfaces.IAction) error
 	endTurn(playerId string) error
 	forfeit(playerId string) error
 	getData() map[string]interface{}
@@ -28,7 +31,7 @@ type PreparationState struct {
 	deadline time.Time
 }
 
-func (state *PreparationState) executeAction(action IAction) error {
+func (state *PreparationState) executeAction(action matches_interfaces.IAction) error {
 	return exceptions.ActionNotAllowed()
 }
 
@@ -40,7 +43,7 @@ func (state *PreparationState) forfeit(playerId string) error {
 	return exceptions.ActionNotAllowed()
 }
 
-func (state *PreparationState) preparePlayer(playerId string, chosenHeroList []HeroTemplate) error {
+func (state *PreparationState) preparePlayer(playerId string, chosenHeroList []matches_interfaces.HeroTemplate) error {
 	if time.Now().After(state.deadline) {
 		state.session.changeState(&EndState{
 			session:  state.session,
@@ -54,16 +57,21 @@ func (state *PreparationState) preparePlayer(playerId string, chosenHeroList []H
 		return errors.New("invalid player id")
 	}
 
-	heroList := []*Hero{}
+	heroList := []*matches_heroes.Hero{}
 	for _, template := range chosenHeroList {
-		heroList = append(heroList, NewHero(template, player))
+		heroList = append(heroList, matches_heroes.NewHero(template, player))
 	}
 
 	if len(chosenHeroList) != numberOfHero {
 		return errors.New("invalid number of heroes")
 	}
 
-	player.HeroList = heroList
+	iheroList := make([]matches_interfaces.IHero, len(heroList))
+	for i := range heroList {
+		iheroList[i] = heroList[i]
+	}
+
+	player.HeroList = iheroList
 	return nil
 }
 
@@ -92,10 +100,10 @@ func (state *PreparationState) startBattle() error {
 	for i := range mapStructure {
 		for j := range mapStructure[0] {
 			if mapStructure[i][j] == 3 && cnt1 < len(heroList1) {
-				heroList1[cnt1].Pos = Point{X: j, Y: i}
+				heroList1[cnt1].SetPos(matches_physics.Point{X: j, Y: i})
 				cnt1 += 1
 			} else if mapStructure[i][j] == 4 && cnt2 < len(heroList2) {
-				heroList2[cnt2].Pos = Point{X: j, Y: i}
+				heroList2[cnt2].SetPos(matches_physics.Point{X: j, Y: i})
 				cnt2 += 1
 			}
 		}
@@ -122,7 +130,7 @@ type Player1TurnState struct {
 	deadline time.Time
 }
 
-func (state *Player1TurnState) executeAction(action IAction) error {
+func (state *Player1TurnState) executeAction(action matches_interfaces.IAction) error {
 	if time.Now().After(state.deadline) {
 		state.session.changeState(&Player2TurnState{
 			session:  state.session,
@@ -131,12 +139,12 @@ func (state *Player1TurnState) executeAction(action IAction) error {
 		return exceptions.ExceededDeadlineError()
 	}
 
-	playerId := action.getSourcePlayerId()
+	playerId := action.GetSourcePlayerId()
 	if state.session.player1.Id != playerId {
 		return exceptions.ActionNotAllowed()
 	}
 
-	err := action.apply(state.session)
+	err := action.Apply(state.session)
 	if err != nil {
 		return err
 	}
@@ -152,7 +160,7 @@ func (state *Player1TurnState) executeAction(action IAction) error {
 		return nil
 	}
 
-	hasAction := state.session.player1.hasAvailableAction()
+	hasAction := state.session.player1.HasAvailableAction()
 	if !hasAction {
 		state.session.changeState(&Player2TurnState{
 			session:  state.session,
@@ -190,7 +198,7 @@ func (state *Player1TurnState) forfeit(playerId string) error {
 	return nil
 }
 
-func (state *Player1TurnState) preparePlayer(playerId string, chosenHeroList []HeroTemplate) error {
+func (state *Player1TurnState) preparePlayer(playerId string, chosenHeroList []matches_interfaces.HeroTemplate) error {
 	return exceptions.ActionNotAllowed()
 }
 
@@ -211,7 +219,7 @@ type Player2TurnState struct {
 	deadline time.Time
 }
 
-func (state *Player2TurnState) executeAction(action IAction) error {
+func (state *Player2TurnState) executeAction(action matches_interfaces.IAction) error {
 	if time.Now().After(state.deadline) {
 		state.session.changeState(&Player1TurnState{
 			session:  state.session,
@@ -220,12 +228,12 @@ func (state *Player2TurnState) executeAction(action IAction) error {
 		return exceptions.ExceededDeadlineError()
 	}
 
-	playerId := action.getSourcePlayerId()
+	playerId := action.GetSourcePlayerId()
 	if state.session.player2.Id != playerId {
 		return exceptions.ActionNotAllowed()
 	}
 
-	err := action.apply(state.session)
+	err := action.Apply(state.session)
 	if err != nil {
 		return err
 	}
@@ -241,7 +249,7 @@ func (state *Player2TurnState) executeAction(action IAction) error {
 		return nil
 	}
 
-	hasAction := state.session.player2.hasAvailableAction()
+	hasAction := state.session.player2.HasAvailableAction()
 	if !hasAction {
 		state.session.changeState(&Player1TurnState{
 			session:  state.session,
@@ -279,7 +287,7 @@ func (state *Player2TurnState) forfeit(playerId string) error {
 	return nil
 }
 
-func (state *Player2TurnState) preparePlayer(playerId string, chosenHeroList []HeroTemplate) error {
+func (state *Player2TurnState) preparePlayer(playerId string, chosenHeroList []matches_interfaces.HeroTemplate) error {
 	return exceptions.ActionNotAllowed()
 }
 
@@ -300,7 +308,7 @@ type EndState struct {
 	winnerId string
 }
 
-func (state *EndState) executeAction(action IAction) error {
+func (state *EndState) executeAction(action matches_interfaces.IAction) error {
 	return exceptions.ActionNotAllowed()
 }
 
@@ -312,7 +320,7 @@ func (state *EndState) forfeit(playerId string) error {
 	return exceptions.ActionNotAllowed()
 }
 
-func (state *EndState) preparePlayer(playerId string, chosenHeroList []HeroTemplate) error {
+func (state *EndState) preparePlayer(playerId string, chosenHeroList []matches_interfaces.HeroTemplate) error {
 	return exceptions.ActionNotAllowed()
 }
 

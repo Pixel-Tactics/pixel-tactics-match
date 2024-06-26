@@ -6,6 +6,8 @@ import (
 	"github.com/google/uuid"
 	"pixeltactics.com/match/src/data_structures"
 	"pixeltactics.com/match/src/matches"
+	matches_heroes_templates "pixeltactics.com/match/src/matches/heroes/templates"
+	matches_maps "pixeltactics.com/match/src/matches/maps"
 )
 
 type SessionRepository struct {
@@ -34,10 +36,10 @@ func (repo *SessionRepository) CreateSession(playerId string, opponentId string)
 	if isPlayerInSession {
 		sessionOpponent, _ := playerSession.GetOpponentPlayerSync(playerId)
 		if sessionOpponent.Id != opponentId {
-			if playerSession.GetRunning() {
+			if playerSession.GetRunningSync() {
 				return nil, errors.New("player is already on a session with another player")
 			} else {
-				repo.DeleteSession(playerSession.GetId())
+				repo.DeleteSession(playerSession.GetIdSync())
 			}
 		} else {
 			return nil, errors.New("session is already created")
@@ -51,7 +53,7 @@ func (repo *SessionRepository) CreateSession(playerId string, opponentId string)
 			return nil, errors.New("opponent is already on a session with another player")
 		} else {
 			repo.playerSession.Store(playerId, opponentSession)
-			opponentSession.RunSession()
+			opponentSession.RunSessionSync()
 			return opponentSession, nil
 		}
 	}
@@ -62,12 +64,12 @@ func (repo *SessionRepository) CreateSession(playerId string, opponentId string)
 		return nil, errors.New("duplicate session id")
 	}
 
-	matchMap, err := matches.GenerateMap()
+	matchMap, err := matches_maps.GenerateMap()
 	if err != nil {
 		return nil, err
 	}
 
-	availableHeroList, err := matches.GetAvailableHeroes()
+	availableHeroList, err := matches_heroes_templates.GetAvailableHeroes()
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +87,7 @@ func (repo *SessionRepository) DeleteSession(sessionId string) {
 		return
 	}
 
-	player1Id, player2Id := session.GetPlayers()
+	player1Id, player2Id := session.GetPlayersSync()
 	session1, ok1 := repo.playerSession.Load(player1Id)
 	if ok1 && session1 == session {
 		repo.playerSession.Delete(player1Id)

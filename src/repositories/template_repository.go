@@ -3,15 +3,16 @@ package repositories
 import (
 	"errors"
 
-	"pixeltactics.com/match/src/matches"
+	matches_heroes_templates "pixeltactics.com/match/src/matches/heroes/templates"
+	matches_interfaces "pixeltactics.com/match/src/matches/interfaces"
 )
 
 type TemplateRepository struct {
-	Knight matches.Knight
-	Mage   matches.Mage
+	Knight matches_heroes_templates.Knight
+	Mage   matches_heroes_templates.Mage
 }
 
-func (repo TemplateRepository) GetTemplateFromName(name string) (matches.HeroTemplate, error) {
+func (repo TemplateRepository) GetTemplateFromName(name string) (matches_interfaces.HeroTemplate, error) {
 	if name == "knight" {
 		return &repo.Knight, nil
 	} else if name == "mage" {
@@ -25,8 +26,8 @@ var templateRepository *TemplateRepository = nil
 func GetTemplateRepository() *TemplateRepository {
 	if templateRepository == nil {
 		templateRepository = &TemplateRepository{
-			Knight: matches.Knight{},
-			Mage:   matches.Mage{},
+			Knight: matches_heroes_templates.Knight{},
+			Mage:   matches_heroes_templates.Mage{},
 		}
 	}
 	return templateRepository
