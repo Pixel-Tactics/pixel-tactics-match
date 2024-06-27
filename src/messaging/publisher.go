@@ -87,6 +87,9 @@ func newPublisher() *Publisher {
 				)
 				if err != nil {
 					publisher.waitList <- msg
+					log.Println(err.Error())
+				} else {
+					log.Println("message sent")
 				}
 
 				cancel()
