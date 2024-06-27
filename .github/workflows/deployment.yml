@@ -34,4 +34,4 @@ jobs:
           script: |
             docker container rm -f ${{ vars.DOCKER_CONTAINER_NAME }}
             docker image rm -f ${{ vars.DOCKER_HUB_USER }}/${{ vars.DOCKER_IMAGE_NAME }}:${{ vars.DOCKER_IMAGE_TAG }}
-            docker run --name ${{ vars.DOCKER_CONTAINER_NAME }} -e USER_MICROSERVICE_URL=${{ secrets.USER_MICROSERVICE_URL }} -e RABBITMQ_CONNECTION_STRING=${{ secrets.RABBITMQ_CONNECTION_STRING }} -d --restart unless-stopped -p 8080:8080 ${{ vars.DOCKER_HUB_USER }}/${{ vars.DOCKER_IMAGE_NAME }}:${{ vars.DOCKER_IMAGE_TAG }}
+            docker run --name ${{ vars.DOCKER_CONTAINER_NAME }} -e USER_MICROSERVICE_URL=${{ secrets.USER_MICROSERVICE_URL }} -e RABBITMQ_CONNECTION_STRING=${{ secrets.RABBITMQ_CONNECTION_STRING }} -d --restart unless-stopped -p 8000:8000 ${{ vars.DOCKER_HUB_USER }}/${{ vars.DOCKER_IMAGE_NAME }}:${{ vars.DOCKER_IMAGE_TAG }}
