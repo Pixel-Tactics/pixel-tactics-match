@@ -1,0 +1,37 @@
+name: Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: Deploy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker Hub Login
+        run: |
+          echo ${{ secrets.DOCKER_HUB_TOKEN }} | docker login -u ${{ vars.DOCKER_HUB_USER }} --password-stdin docker.io
+
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ vars.DOCKER_HUB_USER }}/${{ vars.DOCKER_IMAGE_NAME }}:${{ vars.DOCKER_IMAGE_TAG }} .
+
+      - name: Push Image to Docker Hub
+        run: docker push ${{ vars.DOCKER_HUB_USER }}/${{ vars.DOCKER_IMAGE_NAME }}:${{ vars.DOCKER_IMAGE_TAG }}
+
+      - name: Run Docker Image
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.DEPLOYMENT_HOST }}
+          username: ${{ secrets.DEPLOYMENT_HOST_USERNAME }}
+          key: ${{ secrets.DEPLOYMENT_HOST_KEY }}
+          port: 22
+          script: |
+            docker container rm -f ${{ vars.DOCKER_CONTAINER_NAME }}
+            docker image rm -f ${{ vars.DOCKER_HUB_USER }}/${{ vars.DOCKER_IMAGE_NAME }}:${{ vars.DOCKER_IMAGE_TAG }}
+            docker run --name ${{ vars.DOCKER_CONTAINER_NAME }} -e USER_MICROSERVICE_URL=${{ secrets.USER_MICROSERVICE_URL }} -e RABBITMQ_CONNECTION_STRING=${{ secrets.RABBITMQ_CONNECTION_STRING }} -d --restart unless-stopped -p 8080:8080 ${{ vars.DOCKER_HUB_USER }}/${{ vars.DOCKER_IMAGE_NAME }}:${{ vars.DOCKER_IMAGE_TAG }}
