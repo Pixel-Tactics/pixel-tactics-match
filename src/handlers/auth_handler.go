@@ -1,14 +1,11 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
 	"log"
-	"net/http"
-	"os"
 
 	"pixeltactics.com/match/src/exceptions"
+	integration_users "pixeltactics.com/match/src/integrations/users"
 	"pixeltactics.com/match/src/utils"
 	ws_types "pixeltactics.com/match/src/websocket/types"
 )
@@ -100,46 +97,21 @@ func (handler *AuthHandler) sendAuthRequest(playerToken string, res *ws_types.Re
 			}
 		}
 
-		host := os.Getenv("USER_MICROSERVICE_URL")
-		client := &http.Client{}
-		req, err := http.NewRequest("GET", host+"/auth/current", nil)
+		playerId, err := integration_users.GetUsernameFromToken(playerToken)
 		if err != nil {
-			log.Println("ERROR REQUEST MAKE")
 			sendError()
-		}
-		req.Header.Set("Authorization", "Bearer "+playerToken)
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Println("ERROR REQUEST SEND")
-			sendError()
+			return
 		}
 
-		if resp.StatusCode == 200 {
-			jsonBytes, err := io.ReadAll(resp.Body)
-			if err != nil {
-				sendError()
-			}
-
-			var body map[string]string
-			json.Unmarshal(jsonBytes, &body)
-
-			playerId, ok := body["username"]
-			if !ok {
-				sendError()
-			}
-
-			handler.successResponses <- &ws_types.Interaction{
-				Request: &ws_types.Request{
-					Message: &ws_types.Message{
-						Body: map[string]interface{}{
-							"playerId": playerId,
-						},
+		handler.successResponses <- &ws_types.Interaction{
+			Request: &ws_types.Request{
+				Message: &ws_types.Message{
+					Body: map[string]interface{}{
+						"playerId": playerId,
 					},
 				},
-				Response: res,
-			}
-		} else {
-			sendError()
+			},
+			Response: res,
 		}
 	}()
 }
