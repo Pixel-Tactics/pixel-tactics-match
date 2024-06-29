@@ -9,8 +9,8 @@ import (
 	"os"
 
 	"pixeltactics.com/match/src/exceptions"
-	"pixeltactics.com/match/src/types"
 	"pixeltactics.com/match/src/utils"
+	ws_types "pixeltactics.com/match/src/websocket/types"
 )
 
 type AuthMessageBody struct {
@@ -18,12 +18,12 @@ type AuthMessageBody struct {
 }
 
 type AuthHandler struct {
-	Interaction      chan *types.Interaction
-	successResponses chan *types.Interaction
-	errorResponses   chan *types.Interaction
+	Interaction      chan *ws_types.Interaction
+	successResponses chan *ws_types.Interaction
+	errorResponses   chan *ws_types.Interaction
 }
 
-func (handler *AuthHandler) AuthenticateClient(req *types.Request, res *types.Response) {
+func (handler *AuthHandler) AuthenticateClient(req *ws_types.Request, res *ws_types.Response) {
 	var body AuthMessageBody
 	err := utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
@@ -33,8 +33,8 @@ func (handler *AuthHandler) AuthenticateClient(req *types.Request, res *types.Re
 
 	playerId := body.PlayerToken
 	if len(playerId) == 0 {
-		res.SendToClient(&types.Message{
-			Action: types.ACTION_ERROR,
+		res.SendToClient(&ws_types.Message{
+			Action: ws_types.ACTION_ERROR,
 			Body: map[string]interface{}{
 				"status":  "failed",
 				"message": "invalid player token",
@@ -46,7 +46,7 @@ func (handler *AuthHandler) AuthenticateClient(req *types.Request, res *types.Re
 	handler.sendAuthRequest(body.PlayerToken, res)
 }
 
-func (handler *AuthHandler) handleSuccess(req *types.Request, res *types.Response) {
+func (handler *AuthHandler) handleSuccess(req *ws_types.Request, res *ws_types.Response) {
 	playerIdRaw, ok := req.Message.Body["playerId"]
 	if !ok {
 		log.Println(exceptions.InvalidJsonError())
@@ -60,8 +60,8 @@ func (handler *AuthHandler) handleSuccess(req *types.Request, res *types.Respons
 	}
 
 	res.RegisterPlayer(playerId)
-	res.SendToClient(&types.Message{
-		Action: types.ACTION_FEEDBACK,
+	res.SendToClient(&ws_types.Message{
+		Action: ws_types.ACTION_FEEDBACK,
 		Body: map[string]interface{}{
 			"status":  "success",
 			"message": "user registered on session",
@@ -69,7 +69,7 @@ func (handler *AuthHandler) handleSuccess(req *types.Request, res *types.Respons
 	})
 }
 
-func (handler *AuthHandler) handleError(req *types.Request, res *types.Response) {
+func (handler *AuthHandler) handleError(req *ws_types.Request, res *ws_types.Response) {
 	msgRaw, ok := req.Message.Body["message"]
 	if !ok {
 		log.Println(exceptions.InvalidJsonError())
@@ -85,12 +85,12 @@ func (handler *AuthHandler) handleError(req *types.Request, res *types.Response)
 	res.SendToClient(utils.ErrorMessage(errors.New(msg)))
 }
 
-func (handler *AuthHandler) sendAuthRequest(playerToken string, res *types.Response) {
+func (handler *AuthHandler) sendAuthRequest(playerToken string, res *ws_types.Response) {
 	go func() {
 		sendError := func() {
-			handler.errorResponses <- &types.Interaction{
-				Request: &types.Request{
-					Message: &types.Message{
+			handler.errorResponses <- &ws_types.Interaction{
+				Request: &ws_types.Request{
+					Message: &ws_types.Message{
 						Body: map[string]interface{}{
 							"message": "invalid token",
 						},
@@ -128,9 +128,9 @@ func (handler *AuthHandler) sendAuthRequest(playerToken string, res *types.Respo
 				sendError()
 			}
 
-			handler.successResponses <- &types.Interaction{
-				Request: &types.Request{
-					Message: &types.Message{
+			handler.successResponses <- &ws_types.Interaction{
+				Request: &ws_types.Request{
+					Message: &ws_types.Message{
 						Body: map[string]interface{}{
 							"playerId": playerId,
 						},
@@ -146,9 +146,9 @@ func (handler *AuthHandler) sendAuthRequest(playerToken string, res *types.Respo
 
 func NewAuthHandler() *AuthHandler {
 	return &AuthHandler{
-		Interaction:      make(chan *types.Interaction, 256),
-		successResponses: make(chan *types.Interaction, 256),
-		errorResponses:   make(chan *types.Interaction, 256),
+		Interaction:      make(chan *ws_types.Interaction, 256),
+		successResponses: make(chan *ws_types.Interaction, 256),
+		errorResponses:   make(chan *ws_types.Interaction, 256),
 	}
 }
 
@@ -156,7 +156,7 @@ func (handler *AuthHandler) Run() {
 	for {
 		select {
 		case interaction := <-handler.Interaction:
-			if interaction.Request.Message.Action == types.ACTION_AUTH {
+			if interaction.Request.Message.Action == ws_types.ACTION_AUTH {
 				handler.AuthenticateClient(interaction.Request, interaction.Response)
 			}
 		case successResp := <-handler.successResponses:

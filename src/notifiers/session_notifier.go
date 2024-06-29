@@ -3,7 +3,7 @@ package notifiers
 import (
 	"sync"
 
-	"pixeltactics.com/match/src/types"
+	ws_types "pixeltactics.com/match/src/websocket/types"
 )
 
 type SessionNotifier struct {
@@ -13,7 +13,7 @@ type SessionNotifier struct {
 func (notifier *SessionNotifier) NotifyChangeState(playerId string, sessionData map[string]interface{}) {
 	notifier.SendChannel <- &NotifierData{
 		PlayerId: playerId,
-		Message: types.Message{
+		Message: ws_types.Message{
 			Action: "STATE_CHANGE",
 			Body: map[string]interface{}{
 				"session": sessionData,
@@ -25,8 +25,8 @@ func (notifier *SessionNotifier) NotifyChangeState(playerId string, sessionData 
 func (notifier *SessionNotifier) NotifyAction(playerId string, actionName string, actionData map[string]interface{}) {
 	notifier.SendChannel <- &NotifierData{
 		PlayerId: playerId,
-		Message: types.Message{
-			Action: types.ACTION_APPLY_ACTION,
+		Message: ws_types.Message{
+			Action: ws_types.ACTION_APPLY_ACTION,
 			Body: map[string]interface{}{
 				"actionName":     actionName,
 				"actionSpecific": actionData,

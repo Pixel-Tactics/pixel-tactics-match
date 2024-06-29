@@ -1,4 +1,4 @@
-package types
+package ws_types
 
 import (
 	"encoding/json"

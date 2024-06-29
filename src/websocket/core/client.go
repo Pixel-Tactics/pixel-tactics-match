@@ -1,7 +1,7 @@
 package ws
 
 import (
-	"pixeltactics.com/match/src/types"
+	ws_types "pixeltactics.com/match/src/websocket/types"
 
 	"net/http"
 	"time"
@@ -28,7 +28,7 @@ var upgrader = websocket.Upgrader{}
 type Client struct {
 	hub     *ClientHub
 	conn    *websocket.Conn
-	receive chan *types.Message
+	receive chan *ws_types.Message
 }
 
 func (client *Client) handleReceive() {
@@ -45,7 +45,7 @@ func (client *Client) handleReceive() {
 			break
 		}
 
-		message, err := types.JsonBytesToMessage(jsonBytes)
+		message, err := ws_types.JsonBytesToMessage(jsonBytes)
 		if err != nil {
 			continue
 		}
@@ -78,7 +78,7 @@ func (client *Client) handleSend() {
 				return
 			}
 
-			jsonBytes, err := types.MessageToJsonBytes(message)
+			jsonBytes, err := ws_types.MessageToJsonBytes(message)
 			if err != nil {
 				return
 			}
@@ -105,7 +105,7 @@ func ServeWebSocket(hub *ClientHub, w http.ResponseWriter, r *http.Request) {
 	client := &Client{
 		hub:     hub,
 		conn:    conn,
-		receive: make(chan *types.Message, 256),
+		receive: make(chan *ws_types.Message, 256),
 	}
 
 	client.hub.registerClient <- client

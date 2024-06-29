@@ -2,12 +2,12 @@ package ws
 
 import (
 	"pixeltactics.com/match/src/handlers"
-	"pixeltactics.com/match/src/types"
 	"pixeltactics.com/match/src/utils"
+	ws_types "pixeltactics.com/match/src/websocket/types"
 )
 
 type MessageWithClient struct {
-	Message *types.Message
+	Message *ws_types.Message
 	Client  *Client
 }
 
@@ -97,20 +97,20 @@ func (hub *ClientHub) Run() {
 			message := pair.Message
 			client := pair.Client
 
-			interaction := &types.Interaction{
-				Request: &types.Request{
+			interaction := &ws_types.Interaction{
+				Request: &ws_types.Request{
 					Message: message,
 				},
-				Response: &types.Response{
-					SendToClient: func(inMessage *types.Message) {
+				Response: &ws_types.Response{
+					SendToClient: func(inMessage *ws_types.Message) {
 						inMessage.Identifier = message.Identifier
 						client.receive <- inMessage
 					},
-					NotifyClient: func(inMessage *types.Message) {
+					NotifyClient: func(inMessage *ws_types.Message) {
 						inMessage.Identifier = "notification"
 						client.receive <- inMessage
 					},
-					NotifyOtherClient: func(playerId string, inMessage *types.Message) {
+					NotifyOtherClient: func(playerId string, inMessage *ws_types.Message) {
 						inMessage.Identifier = "notification"
 						otherClient, ok := hub.GetClientFromPlayerId(playerId)
 						if ok {
@@ -123,7 +123,7 @@ func (hub *ClientHub) Run() {
 				},
 			}
 
-			if message.Action == types.ACTION_AUTH {
+			if message.Action == ws_types.ACTION_AUTH {
 				authHandler.Interaction <- interaction
 			} else {
 				playerId, hasPlayer := hub.GetPlayerIdFromClient(client)

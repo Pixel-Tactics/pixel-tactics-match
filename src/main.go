@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"pixeltactics.com/match/src/utils"
-	ws "pixeltactics.com/match/src/websocket"
+	ws "pixeltactics.com/match/src/websocket/core"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"

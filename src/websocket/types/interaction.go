@@ -1,4 +1,4 @@
-package types
+package ws_types
 
 type Request struct {
 	Message *Message

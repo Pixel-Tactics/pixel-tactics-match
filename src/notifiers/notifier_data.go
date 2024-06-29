@@ -1,8 +1,8 @@
 package notifiers
 
-import "pixeltactics.com/match/src/types"
+import ws_types "pixeltactics.com/match/src/websocket/types"
 
 type NotifierData struct {
 	PlayerId string
-	Message  types.Message
+	Message  ws_types.Message
 }

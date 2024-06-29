@@ -5,16 +5,16 @@ import (
 
 	"pixeltactics.com/match/src/notifiers"
 	"pixeltactics.com/match/src/services"
-	"pixeltactics.com/match/src/types"
 	"pixeltactics.com/match/src/utils"
+	ws_types "pixeltactics.com/match/src/websocket/types"
 )
 
 type SessionHandler struct {
 	matchService services.MatchService
-	Interaction  chan *types.Interaction
+	Interaction  chan *ws_types.Interaction
 }
 
-func (handler *SessionHandler) GetSession(req *types.Request, res *types.Response) {
+func (handler *SessionHandler) GetSession(req *ws_types.Request, res *ws_types.Response) {
 	var body services.GetSessionRequestDTO
 	err := utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
@@ -27,14 +27,14 @@ func (handler *SessionHandler) GetSession(req *types.Request, res *types.Respons
 		return
 	}
 
-	res.SendToClient(&types.Message{
-		Action:     types.ACTION_FEEDBACK,
+	res.SendToClient(&ws_types.Message{
+		Action:     ws_types.ACTION_FEEDBACK,
 		Identifier: req.Message.Identifier,
 		Body:       session,
 	})
 }
 
-func (handler *SessionHandler) CreateSession(req *types.Request, res *types.Response) {
+func (handler *SessionHandler) CreateSession(req *ws_types.Request, res *ws_types.Response) {
 	var body services.CreateSessionRequestDTO
 	err := utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
@@ -53,31 +53,31 @@ func (handler *SessionHandler) CreateSession(req *types.Request, res *types.Resp
 		return
 	}
 
-	res.SendToClient(&types.Message{
-		Action: types.ACTION_FEEDBACK,
+	res.SendToClient(&ws_types.Message{
+		Action: ws_types.ACTION_FEEDBACK,
 		Body: map[string]interface{}{
 			"success": true,
 		},
 	})
 
 	if !session.GetRunningSync() {
-		res.NotifyOtherClient(body.OpponentId, &types.Message{
-			Action: types.ACTION_INVITE_SESSION,
+		res.NotifyOtherClient(body.OpponentId, &ws_types.Message{
+			Action: ws_types.ACTION_INVITE_SESSION,
 			Body: map[string]interface{}{
 				"playerId": body.PlayerId,
 			},
 		})
 	} else {
 		sessionMap := session.GetDataSync()
-		res.NotifyOtherClient(body.OpponentId, &types.Message{
-			Action: types.ACTION_START_SESSION,
+		res.NotifyOtherClient(body.OpponentId, &ws_types.Message{
+			Action: ws_types.ACTION_START_SESSION,
 			Body: map[string]interface{}{
 				"opponentId": body.PlayerId,
 				"session":    sessionMap,
 			},
 		})
-		res.NotifyClient(&types.Message{
-			Action: types.ACTION_START_SESSION,
+		res.NotifyClient(&ws_types.Message{
+			Action: ws_types.ACTION_START_SESSION,
 			Body: map[string]interface{}{
 				"opponentId": body.OpponentId,
 				"session":    sessionMap,
@@ -86,7 +86,7 @@ func (handler *SessionHandler) CreateSession(req *types.Request, res *types.Resp
 	}
 }
 
-func (handler *SessionHandler) PreparePlayer(req *types.Request, res *types.Response) {
+func (handler *SessionHandler) PreparePlayer(req *ws_types.Request, res *ws_types.Response) {
 	var body services.PreparePlayerRequestDTO
 	err := utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
@@ -100,15 +100,15 @@ func (handler *SessionHandler) PreparePlayer(req *types.Request, res *types.Resp
 		return
 	}
 
-	res.SendToClient(&types.Message{
-		Action: types.ACTION_FEEDBACK,
+	res.SendToClient(&ws_types.Message{
+		Action: ws_types.ACTION_FEEDBACK,
 		Body: map[string]interface{}{
 			"success": true,
 		},
 	})
 }
 
-func (handler *SessionHandler) ExecuteAction(req *types.Request, res *types.Response) {
+func (handler *SessionHandler) ExecuteAction(req *ws_types.Request, res *ws_types.Response) {
 	var body services.ExecuteActionRequestDTO
 	err := utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
@@ -123,7 +123,7 @@ func (handler *SessionHandler) ExecuteAction(req *types.Request, res *types.Resp
 	}
 }
 
-func (handler *SessionHandler) EndTurn(req *types.Request, res *types.Response) {
+func (handler *SessionHandler) EndTurn(req *ws_types.Request, res *ws_types.Response) {
 	playerIdInterface, ok := req.Message.Body["playerId"]
 	if !ok {
 		res.SendToClient(utils.ErrorMessage(errors.New("no player id")))
@@ -142,11 +142,11 @@ func (handler *SessionHandler) EndTurn(req *types.Request, res *types.Response) 
 	}
 }
 
-func (handler *SessionHandler) GetServerTime(req *types.Request, res *types.Response) {
+func (handler *SessionHandler) GetServerTime(req *ws_types.Request, res *ws_types.Response) {
 	curTime := float64(handler.matchService.GetServerTime().UnixMilli())
 	resTime := curTime / 1000.0
-	res.SendToClient(&types.Message{
-		Action: types.ACTION_FEEDBACK,
+	res.SendToClient(&ws_types.Message{
+		Action: ws_types.ACTION_FEEDBACK,
 		Body: map[string]interface{}{
 			"localTime":  req.Message.Body["localTime"],
 			"serverTime": resTime,
@@ -160,17 +160,17 @@ func (handler *SessionHandler) Run() {
 		req := interaction.Request
 		res := interaction.Response
 		if ok {
-			if req.Message.Action == types.ACTION_GET_SESSION {
+			if req.Message.Action == ws_types.ACTION_GET_SESSION {
 				handler.GetSession(req, res)
-			} else if req.Message.Action == types.ACTION_CREATE_SESSION {
+			} else if req.Message.Action == ws_types.ACTION_CREATE_SESSION {
 				handler.CreateSession(req, res)
-			} else if req.Message.Action == types.ACTION_SERVER_TIME {
+			} else if req.Message.Action == ws_types.ACTION_SERVER_TIME {
 				handler.GetServerTime(req, res)
-			} else if req.Message.Action == types.ACTION_PREPARE_PLAYER {
+			} else if req.Message.Action == ws_types.ACTION_PREPARE_PLAYER {
 				handler.PreparePlayer(req, res)
-			} else if req.Message.Action == types.ACTION_EXECUTE_ACTION {
+			} else if req.Message.Action == ws_types.ACTION_EXECUTE_ACTION {
 				handler.ExecuteAction(req, res)
-			} else if req.Message.Action == types.ACTION_END_TURN {
+			} else if req.Message.Action == ws_types.ACTION_END_TURN {
 				handler.EndTurn(req, res)
 			}
 			handler.handleNotifierChannel(res)
@@ -178,7 +178,7 @@ func (handler *SessionHandler) Run() {
 	}
 }
 
-func (handler *SessionHandler) handleNotifierChannel(res *types.Response) {
+func (handler *SessionHandler) handleNotifierChannel(res *ws_types.Response) {
 	notifier := notifiers.GetSessionNotifier()
 	for {
 		isBreak := false
@@ -202,6 +202,6 @@ func (handler *SessionHandler) handleNotifierChannel(res *types.Response) {
 func NewSessionHandler() *SessionHandler {
 	return &SessionHandler{
 		matchService: *services.NewMatchService(),
-		Interaction:  make(chan *types.Interaction, 256),
+		Interaction:  make(chan *ws_types.Interaction, 256),
 	}
 }
