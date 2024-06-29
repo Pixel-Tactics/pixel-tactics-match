@@ -68,10 +68,10 @@ func (service *MatchService) PreparePlayer(data PreparePlayerRequestDTO) (bool, 
 	}
 }
 
-func (service *MatchService) ExecuteAction(data ExecuteActionRequestDTO) error {
+func (service *MatchService) ExecuteAction(data ExecuteActionRequestDTO) (map[string]interface{}, error) {
 	session := service.sessionRepository.GetSessionByPlayerId(data.PlayerId)
 	if session == nil {
-		return exceptions.SessionNotFound()
+		return nil, exceptions.SessionNotFound()
 	}
 
 	data.ActionSpecific["playerId"] = data.PlayerId

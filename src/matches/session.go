@@ -304,22 +304,18 @@ func (session *Session) StartBattleSync() error {
 	return session.state.startBattle()
 }
 
-func (session *Session) ExecuteActionSync(actionName string, actionBody map[string]interface{}) error {
+func (session *Session) ExecuteActionSync(actionName string, actionBody map[string]interface{}) (map[string]interface{}, error) {
 	session.lock.Lock()
 	defer session.lock.Unlock()
 	action, err := session.createActionLog(actionName, actionBody)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = session.state.executeAction(action)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	notifier := notifiers.GetSessionNotifier()
-	notifier.NotifyAction(session.player1.Id, action.GetName(), action.GetData())
-	notifier.NotifyAction(session.player2.Id, action.GetName(), action.GetData())
-	return nil
+	return action.GetData(), nil
 }
 
 func (session *Session) EndTurnSync(playerId string) error {

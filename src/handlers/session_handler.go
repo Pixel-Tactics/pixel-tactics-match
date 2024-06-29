@@ -116,11 +116,32 @@ func (handler *SessionHandler) ExecuteAction(req *ws_types.Request, res *ws_type
 		return
 	}
 
-	err = handler.matchService.ExecuteAction(body)
+	opponentId, err := handler.matchService.GetOpponentId(body.PlayerId)
 	if err != nil {
 		res.SendToClient(utils.ErrorMessage(err))
 		return
 	}
+
+	action, err := handler.matchService.ExecuteAction(body)
+	if err != nil {
+		res.SendToClient(utils.ErrorMessage(err))
+		return
+	}
+
+	res.NotifyClient(&ws_types.Message{
+		Action: ws_types.ACTION_APPLY_ACTION,
+		Body: map[string]interface{}{
+			"actionName":     body.ActionName,
+			"actionSpecific": action,
+		},
+	})
+	res.NotifyOtherClient(opponentId, &ws_types.Message{
+		Action: ws_types.ACTION_APPLY_ACTION,
+		Body: map[string]interface{}{
+			"actionName":     body.ActionName,
+			"actionSpecific": action,
+		},
+	})
 }
 
 func (handler *SessionHandler) EndTurn(req *ws_types.Request, res *ws_types.Response) {
