@@ -30,6 +30,12 @@ func main() {
 		})
 	})
 
+	router.GET("/players", func(context *gin.Context) {
+		context.JSON(http.StatusOK, map[string]interface{}{
+			"players": clientHub.GetAllPlayerId(),
+		})
+	})
+
 	router.GET("/ws", func(context *gin.Context) {
 		ws.ServeWebSocket(clientHub, context.Writer, context.Request)
 	})
