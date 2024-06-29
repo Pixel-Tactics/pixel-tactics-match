@@ -9,6 +9,7 @@ type Response struct {
 	NotifyClient      func(message *Message)
 	NotifyOtherClient func(playerId string, message *Message)
 	RegisterPlayer    func(playerId string)
+	GetPlayerList     func() []string
 }
 
 type Interaction struct {
