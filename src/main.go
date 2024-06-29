@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	"pixeltactics.com/match/src/utils"
 	ws "pixeltactics.com/match/src/websocket"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,12 @@ func main() {
 	router.GET("/", func(context *gin.Context) {
 		context.JSON(http.StatusOK, map[string]string{
 			"message": "match service",
+		})
+	})
+
+	router.GET("/region", func(context *gin.Context) {
+		context.JSON(http.StatusOK, map[string]string{
+			"region": utils.GetServerRegion(),
 		})
 	})
 
