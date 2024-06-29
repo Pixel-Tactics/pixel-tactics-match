@@ -6,15 +6,15 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"pixeltactics.com/match/src/data_structures"
 	"pixeltactics.com/match/src/matches"
 	matches_heroes_templates "pixeltactics.com/match/src/matches/heroes/templates"
 	matches_maps "pixeltactics.com/match/src/matches/maps"
+	"pixeltactics.com/match/src/utils"
 )
 
 type SessionRepository struct {
-	sessions      *data_structures.SyncMap[string, *matches.Session]
-	playerSession *data_structures.SyncMap[string, *matches.Session]
+	sessions      *utils.SyncMap[string, *matches.Session]
+	playerSession *utils.SyncMap[string, *matches.Session]
 }
 
 func (repo *SessionRepository) GetSessionById(id string) *matches.Session {
@@ -146,8 +146,8 @@ var onceSession sync.Once
 func GetSessionRepository() *SessionRepository {
 	onceSession.Do(func() {
 		sessionRepository = &SessionRepository{
-			sessions:      data_structures.NewSyncMap[string, *matches.Session](),
-			playerSession: data_structures.NewSyncMap[string, *matches.Session](),
+			sessions:      utils.NewSyncMap[string, *matches.Session](),
+			playerSession: utils.NewSyncMap[string, *matches.Session](),
 		}
 	})
 	return sessionRepository

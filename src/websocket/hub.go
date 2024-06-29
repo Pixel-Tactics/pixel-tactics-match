@@ -1,9 +1,9 @@
 package ws
 
 import (
-	"pixeltactics.com/match/src/data_structures"
 	"pixeltactics.com/match/src/handlers"
 	"pixeltactics.com/match/src/types"
+	"pixeltactics.com/match/src/utils"
 )
 
 type MessageWithClient struct {
@@ -17,8 +17,8 @@ type PlayerRegistration struct {
 }
 
 type PlayerHub struct {
-	playerIdToClient *data_structures.SyncMap[string, *Client]
-	clientToPlayerId *data_structures.SyncMap[*Client, string]
+	playerIdToClient *utils.SyncMap[string, *Client]
+	clientToPlayerId *utils.SyncMap[*Client, string]
 }
 
 func (hub *PlayerHub) RegisterPlayer(playerId string, client *Client) {
@@ -39,7 +39,7 @@ func (hub *PlayerHub) UnregisterPlayer(client *Client) {
 
 type ClientHub struct {
 	playerHub      *PlayerHub
-	clientList     *data_structures.SyncMap[*Client, bool]
+	clientList     *utils.SyncMap[*Client, bool]
 	registerClient chan *Client
 	registerPlayer chan *PlayerRegistration
 	unregister     chan *Client
@@ -139,12 +139,12 @@ func (hub *ClientHub) Run() {
 
 func NewClientHub() *ClientHub {
 	playerHub := &PlayerHub{
-		playerIdToClient: data_structures.NewSyncMap[string, *Client](),
-		clientToPlayerId: data_structures.NewSyncMap[*Client, string](),
+		playerIdToClient: utils.NewSyncMap[string, *Client](),
+		clientToPlayerId: utils.NewSyncMap[*Client, string](),
 	}
 	return &ClientHub{
 		playerHub:      playerHub,
-		clientList:     data_structures.NewSyncMap[*Client, bool](),
+		clientList:     utils.NewSyncMap[*Client, bool](),
 		registerClient: make(chan *Client, 256),
 		registerPlayer: make(chan *PlayerRegistration, 256),
 		unregister:     make(chan *Client, 256),
