@@ -21,6 +21,10 @@ type PlayerHub struct {
 	clientToPlayerId *utils.SyncMap[*Client, string]
 }
 
+func (hub *PlayerHub) GetAllPlayerId() []string {
+	return hub.playerIdToClient.Keys()
+}
+
 func (hub *PlayerHub) RegisterPlayer(playerId string, client *Client) {
 	hub.playerIdToClient.Store(playerId, client)
 	hub.clientToPlayerId.Store(client, playerId)
@@ -44,6 +48,10 @@ type ClientHub struct {
 	registerPlayer chan *PlayerRegistration
 	unregister     chan *Client
 	message        chan *MessageWithClient
+}
+
+func (hub *ClientHub) GetAllPlayerId() []string {
+	return hub.playerHub.GetAllPlayerId()
 }
 
 func (hub *ClientHub) GetClientFromPlayerId(playerId string) (*Client, bool) {
@@ -119,6 +127,9 @@ func (hub *ClientHub) Run() {
 					},
 					RegisterPlayer: func(playerId string) {
 						hub.RegisterPlayer(playerId, client)
+					},
+					GetPlayerList: func() []string {
+						return hub.GetAllPlayerId()
 					},
 				},
 			}
