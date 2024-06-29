@@ -3,6 +3,7 @@ package repositories
 import (
 	"errors"
 	"log"
+	"sync"
 
 	"github.com/google/uuid"
 	"pixeltactics.com/match/src/data_structures"
@@ -140,13 +141,14 @@ func (repo *SessionRepository) checkOpponentSession(playerId string, opponentId 
 }
 
 var sessionRepository *SessionRepository = nil
+var onceSession sync.Once
 
 func GetSessionRepository() *SessionRepository {
-	if sessionRepository == nil {
+	onceSession.Do(func() {
 		sessionRepository = &SessionRepository{
 			sessions:      data_structures.NewSyncMap[string, *matches.Session](),
 			playerSession: data_structures.NewSyncMap[string, *matches.Session](),
 		}
-	}
+	})
 	return sessionRepository
 }

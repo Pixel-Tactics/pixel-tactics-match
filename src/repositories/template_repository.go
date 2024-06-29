@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"errors"
+	"sync"
 
 	matches_heroes_templates "pixeltactics.com/match/src/matches/heroes/templates"
 	matches_interfaces "pixeltactics.com/match/src/matches/interfaces"
@@ -22,13 +23,14 @@ func (repo TemplateRepository) GetTemplateFromName(name string) (matches_interfa
 }
 
 var templateRepository *TemplateRepository = nil
+var onceTemplate sync.Once
 
 func GetTemplateRepository() *TemplateRepository {
-	if templateRepository == nil {
+	onceTemplate.Do(func() {
 		templateRepository = &TemplateRepository{
 			Knight: matches_heroes_templates.Knight{},
 			Mage:   matches_heroes_templates.Mage{},
 		}
-	}
+	})
 	return templateRepository
 }

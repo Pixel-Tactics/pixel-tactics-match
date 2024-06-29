@@ -1,6 +1,8 @@
 package notifiers
 
 import (
+	"sync"
+
 	"pixeltactics.com/match/src/types"
 )
 
@@ -34,12 +36,13 @@ func (notifier *SessionNotifier) NotifyAction(playerId string, actionName string
 }
 
 var sessionNotifier *SessionNotifier = nil
+var once sync.Once
 
 func GetSessionNotifier() *SessionNotifier {
-	if sessionNotifier == nil {
+	once.Do(func() {
 		sessionNotifier = &SessionNotifier{
 			SendChannel: make(chan *NotifierData, 256),
 		}
-	}
+	})
 	return sessionNotifier
 }
