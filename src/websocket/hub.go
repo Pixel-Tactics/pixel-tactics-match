@@ -78,7 +78,6 @@ func (hub *ClientHub) UnregisterClient(client *Client) {
 	}
 }
 
-// TODO: Handle client reconnecting mid game -> player
 func (hub *ClientHub) Run() {
 	authHandler := handlers.NewAuthHandler()
 	go authHandler.Run()

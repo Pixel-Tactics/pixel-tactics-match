@@ -9,8 +9,6 @@ type Response struct {
 	NotifyClient      func(message *Message)
 	NotifyOtherClient func(playerId string, message *Message)
 	RegisterPlayer    func(playerId string)
-	// SendToClient func(data map[string]interface{}, action MessageAction)
-	// SendToClientsInSession func() error
 }
 
 type Interaction struct {

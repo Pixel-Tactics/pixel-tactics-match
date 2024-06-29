@@ -15,7 +15,6 @@ type MatchService struct {
 }
 
 func (service *MatchService) CreateSession(data CreateSessionRequestDTO) (*matches.Session, error) {
-	// TODO: auth middleware (for player)
 	// TODO: check by fetch from account service (to check opponent if they exists)
 	session, err := service.sessionRepository.CreateSession(data.PlayerId, data.OpponentId)
 	if err != nil {
