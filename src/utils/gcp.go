@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	unknownRegion = "Unknown Server Region"
+	unknownRegion = "Unknown Region"
 )
 
 var regionCodeToName = map[string]string{
