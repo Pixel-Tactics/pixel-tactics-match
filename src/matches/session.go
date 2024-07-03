@@ -180,8 +180,10 @@ func (session *Session) createActionLog(actionName string, actionBody map[string
 
 func (session *Session) getData() map[string]interface{} {
 	actionLogData := []map[string]interface{}{}
-	for _, actionLog := range session.actionLog {
-		actionLogData = append(actionLogData, actionLog.GetData())
+	for i, actionLog := range session.actionLog {
+		actionData := actionLog.GetData()
+		actionData["order"] = i
+		actionLogData = append(actionLogData, actionData)
 	}
 	return map[string]interface{}{
 		"id":                session.id,
@@ -315,7 +317,9 @@ func (session *Session) ExecuteActionSync(actionName string, actionBody map[stri
 	if err != nil {
 		return nil, err
 	}
-	return action.GetData(), nil
+	data := action.GetData()
+	data["order"] = len(session.actionLog) - 1
+	return data, nil
 }
 
 func (session *Session) EndTurnSync(playerId string) error {
