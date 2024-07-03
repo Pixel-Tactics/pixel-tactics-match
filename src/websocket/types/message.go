@@ -11,6 +11,7 @@ type MessageAction string
 
 const (
 	ACTION_CREATE_SESSION MessageAction = "CREATE_SESSION"
+	ACTION_IS_IN_SESSION  MessageAction = "IS_IN_SESSION"
 	ACTION_GET_SESSION    MessageAction = "GET_SESSION"
 	ACTION_INVITE_SESSION MessageAction = "INVITE_SESSION"
 	ACTION_START_SESSION  MessageAction = "START_SESSION"

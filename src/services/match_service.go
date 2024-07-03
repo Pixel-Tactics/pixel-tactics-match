@@ -24,15 +24,6 @@ func (service *MatchService) CreateSession(data CreateSessionRequestDTO) (*match
 	return session, nil
 }
 
-func (service *MatchService) GetSession(data GetSessionRequestDTO) (map[string]interface{}, error) {
-	session := service.sessionRepository.GetSessionById(data.SessionId)
-	if session == nil {
-		return nil, exceptions.SessionNotFound()
-	}
-
-	return session.GetDataSync(), nil
-}
-
 func (service *MatchService) GetPlayerSession(playerId string) (map[string]interface{}, error) {
 	session := service.sessionRepository.GetSessionByPlayerId(playerId)
 	if session == nil {

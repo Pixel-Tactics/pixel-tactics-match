@@ -14,14 +14,33 @@ type SessionHandler struct {
 	Interaction  chan *ws_types.Interaction
 }
 
-func (handler *SessionHandler) GetSession(req *ws_types.Request, res *ws_types.Response) {
-	var body services.GetSessionRequestDTO
+func (handler *SessionHandler) GetIsPlayerInSession(req *ws_types.Request, res *ws_types.Response) {
+	var body services.PlayerIdDTO
 	err := utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
 		res.SendToClient(utils.ErrorMessage(err))
 		return
 	}
-	session, err := handler.matchService.GetSession(body)
+
+	_, err = handler.matchService.GetPlayerSession(body.PlayerId)
+	res.SendToClient(&ws_types.Message{
+		Action:     ws_types.ACTION_FEEDBACK,
+		Identifier: req.Message.Identifier,
+		Body: map[string]interface{}{
+			"inSession": err == nil,
+		},
+	})
+}
+
+func (handler *SessionHandler) GetSession(req *ws_types.Request, res *ws_types.Response) {
+	var body services.PlayerIdDTO
+	err := utils.MapToObject(req.Message.Body, &body)
+	if err != nil {
+		res.SendToClient(utils.ErrorMessage(err))
+		return
+	}
+
+	session, err := handler.matchService.GetPlayerSession(body.PlayerId)
 	if err != nil {
 		res.SendToClient(utils.ErrorMessage(err))
 		return
@@ -181,7 +200,9 @@ func (handler *SessionHandler) Run() {
 		req := interaction.Request
 		res := interaction.Response
 		if ok {
-			if req.Message.Action == ws_types.ACTION_GET_SESSION {
+			if req.Message.Action == ws_types.ACTION_IS_IN_SESSION {
+				handler.GetIsPlayerInSession(req, res)
+			} else if req.Message.Action == ws_types.ACTION_GET_SESSION {
 				handler.GetSession(req, res)
 			} else if req.Message.Action == ws_types.ACTION_CREATE_SESSION {
 				handler.CreateSession(req, res)
