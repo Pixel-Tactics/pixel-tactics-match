@@ -8,11 +8,12 @@ import (
 	matches_heroes "pixeltactics.com/match/src/matches/heroes"
 	matches_interfaces "pixeltactics.com/match/src/matches/interfaces"
 	matches_physics "pixeltactics.com/match/src/matches/physics"
+	"pixeltactics.com/match/src/utils"
 )
 
 const (
-	preparationTime = 90 * time.Second
-	playerTurnTime  = 90 * time.Second
+	preparationTime = 60 * time.Second
+	playerTurnTime  = 30 * time.Second
 	numberOfHero    = 1
 )
 
@@ -111,7 +112,7 @@ func (state *PreparationState) startBattle() error {
 
 	state.session.changeState(&Player1TurnState{
 		session:  state.session,
-		deadline: state.deadline.Add(playerTurnTime),
+		deadline: time.Now().Add(playerTurnTime),
 	})
 
 	return nil
@@ -164,7 +165,7 @@ func (state *Player1TurnState) executeAction(action matches_interfaces.IAction) 
 	if !hasAction {
 		state.session.changeState(&Player2TurnState{
 			session:  state.session,
-			deadline: state.deadline.Add(playerTurnTime),
+			deadline: time.Now().Add(playerTurnTime),
 		})
 	}
 
@@ -175,7 +176,7 @@ func (state *Player1TurnState) endTurn(playerId string) error {
 	if state.session.player1.Id == playerId {
 		state.session.changeState(&Player2TurnState{
 			session:  state.session,
-			deadline: state.deadline.Add(playerTurnTime),
+			deadline: utils.MinTime(time.Now(), state.deadline).Add(playerTurnTime),
 		})
 		return nil
 	} else {
@@ -253,7 +254,7 @@ func (state *Player2TurnState) executeAction(action matches_interfaces.IAction) 
 	if !hasAction {
 		state.session.changeState(&Player1TurnState{
 			session:  state.session,
-			deadline: state.deadline.Add(playerTurnTime),
+			deadline: time.Now().Add(playerTurnTime),
 		})
 	}
 
@@ -264,7 +265,7 @@ func (state *Player2TurnState) endTurn(playerId string) error {
 	if state.session.player2.Id == playerId {
 		state.session.changeState(&Player1TurnState{
 			session:  state.session,
-			deadline: state.deadline.Add(playerTurnTime),
+			deadline: utils.MinTime(time.Now(), state.deadline).Add(playerTurnTime),
 		})
 		return nil
 	} else {
