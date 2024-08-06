@@ -204,13 +204,12 @@ func (session *Session) changeState(newState ISessionState) {
 	}
 
 	session.state = newState
-	deadlineIntf, hasDeadline := newState.getData()["deadline"]
-	deadline := deadlineIntf.(time.Time)
+	timedState, isTimed := newState.(ITimedState)
 	_, ok := session.state.(*EndState)
 	if ok {
 		session.processEndResult()
-	} else if hasDeadline {
-		time.AfterFunc(time.Until(deadline), newState.expire)
+	} else if isTimed {
+		time.AfterFunc(time.Until(timedState.getDeadline()), timedState.expire)
 	}
 
 	notifier := notifiers.GetSessionNotifier()
