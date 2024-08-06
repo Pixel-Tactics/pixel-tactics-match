@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 
-	"pixeltactics.com/match/src/notifiers"
 	"pixeltactics.com/match/src/services"
 	"pixeltactics.com/match/src/utils"
 	ws_types "pixeltactics.com/match/src/websocket/types"
@@ -215,31 +214,31 @@ func (handler *SessionHandler) Run() {
 			} else if req.Message.Action == ws_types.ACTION_END_TURN {
 				handler.EndTurn(req, res)
 			}
-			handler.handleNotifierChannel(res)
+			// handler.handleNotifierChannel()
 		}
 	}
 }
 
-func (handler *SessionHandler) handleNotifierChannel(res *ws_types.Response) {
-	notifier := notifiers.GetSessionNotifier()
-	for {
-		isBreak := false
-		select {
-		case msg, ok := <-notifier.SendChannel:
-			if ok {
-				playerId := msg.PlayerId
-				message := msg.Message
-				res.NotifyOtherClient(playerId, &message)
-			}
-		default:
-			isBreak = true
-		}
+// func (handler *SessionHandler) handleNotifierChannel() {
+// 	notifier := notifiers.GetSessionNotifier()
+// 	for {
+// 		isBreak := false
+// 		select {
+// 		case msg, ok := <-notifier.SendChannel:
+// 			if ok {
+// 				playerId := msg.PlayerId
+// 				message := msg.Message
+// 				handler.sendMessageToPlayer(playerId, &message)
+// 			}
+// 		default:
+// 			isBreak = true
+// 		}
 
-		if isBreak {
-			break
-		}
-	}
-}
+// 		if isBreak {
+// 			break
+// 		}
+// 	}
+// }
 
 func NewSessionHandler() *SessionHandler {
 	return &SessionHandler{

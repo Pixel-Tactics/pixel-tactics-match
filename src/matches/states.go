@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	preparationTime = 60 * time.Second
+	preparationTime = 10 * time.Second
 	playerTurnTime  = 30 * time.Second
 	numberOfHero    = 1
 )

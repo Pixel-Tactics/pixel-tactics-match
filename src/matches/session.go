@@ -266,10 +266,12 @@ func (session *Session) RunSessionSync() {
 	session.lock.Lock()
 	defer session.lock.Unlock()
 	session.running = true
-	session.state = &PreparationState{
+	newState := &PreparationState{
 		session:  session,
 		deadline: time.Now().Add(preparationTime),
 	}
+	session.state = newState
+	time.AfterFunc(time.Until(newState.deadline), newState.expire)
 }
 
 func (session *Session) GetRunningSync() bool {

@@ -1,13 +1,14 @@
 package notifiers
 
 import (
-	"sync"
+	"log"
 
 	ws_types "pixeltactics.com/match/src/websocket/types"
 )
 
 type SessionNotifier struct {
-	SendChannel chan *NotifierData
+	SendChannel         chan *NotifierData
+	sendMessageToPlayer func(string, *ws_types.Message)
 }
 
 func (notifier *SessionNotifier) NotifyChangeState(playerId string, sessionData map[string]interface{}) {
@@ -35,14 +36,29 @@ func (notifier *SessionNotifier) NotifyAction(playerId string, actionName string
 	}
 }
 
+func (notifier *SessionNotifier) Run() {
+	for {
+		msg, ok := <-notifier.SendChannel
+		if ok {
+			playerId := msg.PlayerId
+			message := msg.Message
+			notifier.sendMessageToPlayer(playerId, &message)
+		}
+	}
+}
+
 var sessionNotifier *SessionNotifier = nil
-var once sync.Once
+
+func InitSessionNotifier(sendMessageToPlayer func(string, *ws_types.Message)) {
+	sessionNotifier = &SessionNotifier{
+		SendChannel:         make(chan *NotifierData, 256),
+		sendMessageToPlayer: sendMessageToPlayer,
+	}
+}
 
 func GetSessionNotifier() *SessionNotifier {
-	once.Do(func() {
-		sessionNotifier = &SessionNotifier{
-			SendChannel: make(chan *NotifierData, 256),
-		}
-	})
+	if sessionNotifier == nil {
+		log.Fatal("Session Notifier is nil")
+	}
 	return sessionNotifier
 }

@@ -2,6 +2,7 @@ package ws
 
 import (
 	"pixeltactics.com/match/src/handlers"
+	"pixeltactics.com/match/src/notifiers"
 	"pixeltactics.com/match/src/utils"
 	ws_types "pixeltactics.com/match/src/websocket/types"
 )
@@ -86,12 +87,24 @@ func (hub *ClientHub) UnregisterClient(client *Client) {
 	}
 }
 
+func (hub *ClientHub) SendMessageToPlayer(playerId string, msg *ws_types.Message) {
+	msg.Identifier = "notification"
+	otherClient, ok := hub.GetClientFromPlayerId(playerId)
+	if ok {
+		otherClient.receive <- msg
+	}
+}
+
 func (hub *ClientHub) Run() {
 	authHandler := handlers.NewAuthHandler()
 	go authHandler.Run()
 
 	sessionHandler := handlers.NewSessionHandler()
 	go sessionHandler.Run()
+
+	notifiers.InitSessionNotifier(hub.SendMessageToPlayer)
+	sessionNotifier := notifiers.GetSessionNotifier()
+	go sessionNotifier.Run()
 
 	for {
 		select {
