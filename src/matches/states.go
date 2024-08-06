@@ -24,6 +24,7 @@ type ISessionState interface {
 	endTurn(playerId string) error
 	forfeit(playerId string) error
 	getData() map[string]interface{}
+	expire()
 }
 
 // Preparation
@@ -46,10 +47,6 @@ func (state *PreparationState) forfeit(playerId string) error {
 
 func (state *PreparationState) preparePlayer(playerId string, chosenHeroList []matches_interfaces.HeroTemplate) error {
 	if time.Now().After(state.deadline) {
-		state.session.changeState(&EndState{
-			session:  state.session,
-			winnerId: "draw",
-		})
 		return exceptions.ExceededDeadlineError()
 	}
 
@@ -78,10 +75,6 @@ func (state *PreparationState) preparePlayer(playerId string, chosenHeroList []m
 
 func (state *PreparationState) startBattle() error {
 	if time.Now().After(state.deadline) {
-		state.session.changeState(&EndState{
-			session:  state.session,
-			winnerId: "draw",
-		})
 		return exceptions.ExceededDeadlineError()
 	}
 
@@ -118,6 +111,17 @@ func (state *PreparationState) startBattle() error {
 	return nil
 }
 
+func (state *PreparationState) expire() {
+	state.session.lock.Lock()
+	defer state.session.lock.Unlock()
+	if state.session.state == state {
+		state.session.changeState(&EndState{
+			session:  state.session,
+			winnerId: "draw",
+		})
+	}
+}
+
 func (state *PreparationState) getData() map[string]interface{} {
 	return map[string]interface{}{
 		"name":     "PREPARATION",
@@ -133,10 +137,6 @@ type Player1TurnState struct {
 
 func (state *Player1TurnState) executeAction(action matches_interfaces.IAction) error {
 	if time.Now().After(state.deadline) {
-		state.session.changeState(&Player2TurnState{
-			session:  state.session,
-			deadline: state.deadline.Add(playerTurnTime),
-		})
 		return exceptions.ExceededDeadlineError()
 	}
 
@@ -207,6 +207,17 @@ func (state *Player1TurnState) startBattle() error {
 	return exceptions.ActionNotAllowed()
 }
 
+func (state *Player1TurnState) expire() {
+	state.session.lock.Lock()
+	defer state.session.lock.Unlock()
+	if state.session.state == state {
+		state.session.changeState(&Player2TurnState{
+			session:  state.session,
+			deadline: state.deadline.Add(playerTurnTime),
+		})
+	}
+}
+
 func (state *Player1TurnState) getData() map[string]interface{} {
 	return map[string]interface{}{
 		"name":     "PLAYER_1_TURN",
@@ -222,10 +233,6 @@ type Player2TurnState struct {
 
 func (state *Player2TurnState) executeAction(action matches_interfaces.IAction) error {
 	if time.Now().After(state.deadline) {
-		state.session.changeState(&Player1TurnState{
-			session:  state.session,
-			deadline: state.deadline.Add(playerTurnTime),
-		})
 		return exceptions.ExceededDeadlineError()
 	}
 
@@ -296,6 +303,17 @@ func (state *Player2TurnState) startBattle() error {
 	return exceptions.ActionNotAllowed()
 }
 
+func (state *Player2TurnState) expire() {
+	state.session.lock.Lock()
+	defer state.session.lock.Unlock()
+	if state.session.state == state {
+		state.session.changeState(&Player1TurnState{
+			session:  state.session,
+			deadline: state.deadline.Add(playerTurnTime),
+		})
+	}
+}
+
 func (state *Player2TurnState) getData() map[string]interface{} {
 	return map[string]interface{}{
 		"name":     "PLAYER_2_TURN",
@@ -328,6 +346,8 @@ func (state *EndState) preparePlayer(playerId string, chosenHeroList []matches_i
 func (state *EndState) startBattle() error {
 	return exceptions.ActionNotAllowed()
 }
+
+func (state *EndState) expire() {}
 
 func (state *EndState) getData() map[string]interface{} {
 	return map[string]interface{}{
