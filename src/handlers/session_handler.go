@@ -134,32 +134,11 @@ func (handler *SessionHandler) ExecuteAction(req *ws_types.Request, res *ws_type
 		return
 	}
 
-	opponentId, err := handler.matchService.GetOpponentId(body.PlayerId)
+	err = handler.matchService.ExecuteAction(body)
 	if err != nil {
 		res.SendToClient(utils.ErrorMessage(err))
 		return
 	}
-
-	action, err := handler.matchService.ExecuteAction(body)
-	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
-		return
-	}
-
-	res.NotifyClient(&ws_types.Message{
-		Action: ws_types.ACTION_APPLY_ACTION,
-		Body: map[string]interface{}{
-			"actionName":     body.ActionName,
-			"actionSpecific": action,
-		},
-	})
-	res.NotifyOtherClient(opponentId, &ws_types.Message{
-		Action: ws_types.ACTION_APPLY_ACTION,
-		Body: map[string]interface{}{
-			"actionName":     body.ActionName,
-			"actionSpecific": action,
-		},
-	})
 }
 
 func (handler *SessionHandler) EndTurn(req *ws_types.Request, res *ws_types.Response) {
@@ -214,31 +193,9 @@ func (handler *SessionHandler) Run() {
 			} else if req.Message.Action == ws_types.ACTION_END_TURN {
 				handler.EndTurn(req, res)
 			}
-			// handler.handleNotifierChannel()
 		}
 	}
 }
-
-// func (handler *SessionHandler) handleNotifierChannel() {
-// 	notifier := notifiers.GetSessionNotifier()
-// 	for {
-// 		isBreak := false
-// 		select {
-// 		case msg, ok := <-notifier.SendChannel:
-// 			if ok {
-// 				playerId := msg.PlayerId
-// 				message := msg.Message
-// 				handler.sendMessageToPlayer(playerId, &message)
-// 			}
-// 		default:
-// 			isBreak = true
-// 		}
-
-// 		if isBreak {
-// 			break
-// 		}
-// 	}
-// }
 
 func NewSessionHandler() *SessionHandler {
 	return &SessionHandler{

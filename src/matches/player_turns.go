@@ -5,6 +5,7 @@ import (
 
 	"pixeltactics.com/match/src/exceptions"
 	matches_interfaces "pixeltactics.com/match/src/matches/interfaces"
+	"pixeltactics.com/match/src/notifiers"
 	"pixeltactics.com/match/src/utils"
 )
 
@@ -30,6 +31,13 @@ func (state *Player1TurnState) executeAction(action matches_interfaces.IAction) 
 	}
 
 	state.session.actionLog = append(state.session.actionLog, action)
+
+	actionData := action.GetData()
+	actionData["order"] = len(state.session.actionLog) - 1
+
+	notifier := notifiers.GetSessionNotifier()
+	notifier.NotifyAction(state.session.player1.Id, action.GetName(), actionData)
+	notifier.NotifyAction(state.session.player2.Id, action.GetName(), actionData)
 
 	winnerId := state.session.checkWinner()
 	if winnerId != "" {
@@ -130,6 +138,13 @@ func (state *Player2TurnState) executeAction(action matches_interfaces.IAction) 
 	}
 
 	state.session.actionLog = append(state.session.actionLog, action)
+
+	actionData := action.GetData()
+	actionData["order"] = len(state.session.actionLog) - 1
+
+	notifier := notifiers.GetSessionNotifier()
+	notifier.NotifyAction(state.session.player1.Id, action.GetName(), actionData)
+	notifier.NotifyAction(state.session.player2.Id, action.GetName(), actionData)
 
 	winnerId := state.session.checkWinner()
 	if winnerId != "" {

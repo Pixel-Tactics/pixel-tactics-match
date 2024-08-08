@@ -59,14 +59,15 @@ func (service *MatchService) PreparePlayer(data PreparePlayerRequestDTO) (bool, 
 	}
 }
 
-func (service *MatchService) ExecuteAction(data ExecuteActionRequestDTO) (map[string]interface{}, error) {
+func (service *MatchService) ExecuteAction(data ExecuteActionRequestDTO) error {
 	session := service.sessionRepository.GetSessionByPlayerId(data.PlayerId)
 	if session == nil {
-		return nil, exceptions.SessionNotFound()
+		return exceptions.SessionNotFound()
 	}
 
 	data.ActionSpecific["playerId"] = data.PlayerId
-	return session.ExecuteActionSync(data.ActionName, data.ActionSpecific)
+	session.ExecuteActionSync(data.ActionName, data.ActionSpecific)
+	return nil
 }
 
 func (service *MatchService) EndTurn(playerId string) error {

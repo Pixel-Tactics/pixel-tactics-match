@@ -109,10 +109,10 @@ func (session *Session) GetLastAction() (matches_interfaces.IAction, bool) {
 	return session.actionLog[len(session.actionLog)-1], true
 }
 
-func (session *Session) processEndResult() {
+func (session *Session) processEndResult(endState *EndState) {
 	session.running = false
-	winner := session.checkWinner()
-	if winner == "" {
+	winner := endState.winnerId
+	if winner == "draw" {
 		return
 	}
 
@@ -205,9 +205,9 @@ func (session *Session) changeState(newState ISessionState) {
 
 	session.state = newState
 	timedState, isTimed := newState.(ITimedState)
-	_, ok := session.state.(*EndState)
+	endState, ok := session.state.(*EndState)
 	if ok {
-		session.processEndResult()
+		session.processEndResult(endState)
 	} else if isTimed {
 		time.AfterFunc(time.Until(timedState.getDeadline()), timedState.expire)
 	}
@@ -311,20 +311,18 @@ func (session *Session) StartBattleSync() error {
 	return session.state.startBattle()
 }
 
-func (session *Session) ExecuteActionSync(actionName string, actionBody map[string]interface{}) (map[string]interface{}, error) {
+func (session *Session) ExecuteActionSync(actionName string, actionBody map[string]interface{}) error {
 	session.lock.Lock()
 	defer session.lock.Unlock()
 	action, err := session.createActionLog(actionName, actionBody)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	err = session.state.executeAction(action)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	data := action.GetData()
-	data["order"] = len(session.actionLog) - 1
-	return data, nil
+	return nil
 }
 
 func (session *Session) EndTurnSync(playerId string) error {
