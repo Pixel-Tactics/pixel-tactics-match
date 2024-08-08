@@ -24,15 +24,6 @@ func (service *MatchService) CreateSession(data CreateSessionRequestDTO) (*match
 	return session, nil
 }
 
-func (service *MatchService) GetSession(data GetSessionRequestDTO) (map[string]interface{}, error) {
-	session := service.sessionRepository.GetSessionById(data.SessionId)
-	if session == nil {
-		return nil, exceptions.SessionNotFound()
-	}
-
-	return session.GetDataSync(), nil
-}
-
 func (service *MatchService) GetPlayerSession(playerId string) (map[string]interface{}, error) {
 	session := service.sessionRepository.GetSessionByPlayerId(playerId)
 	if session == nil {
@@ -68,14 +59,15 @@ func (service *MatchService) PreparePlayer(data PreparePlayerRequestDTO) (bool, 
 	}
 }
 
-func (service *MatchService) ExecuteAction(data ExecuteActionRequestDTO) (map[string]interface{}, error) {
+func (service *MatchService) ExecuteAction(data ExecuteActionRequestDTO) error {
 	session := service.sessionRepository.GetSessionByPlayerId(data.PlayerId)
 	if session == nil {
-		return nil, exceptions.SessionNotFound()
+		return exceptions.SessionNotFound()
 	}
 
 	data.ActionSpecific["playerId"] = data.PlayerId
-	return session.ExecuteActionSync(data.ActionName, data.ActionSpecific)
+	session.ExecuteActionSync(data.ActionName, data.ActionSpecific)
+	return nil
 }
 
 func (service *MatchService) EndTurn(playerId string) error {

@@ -109,10 +109,10 @@ func (session *Session) GetLastAction() (matches_interfaces.IAction, bool) {
 	return session.actionLog[len(session.actionLog)-1], true
 }
 
-func (session *Session) processEndResult() {
+func (session *Session) processEndResult(endState *EndState) {
 	session.running = false
-	winner := session.checkWinner()
-	if winner == "" {
+	winner := endState.winnerId
+	if winner == "draw" {
 		return
 	}
 
@@ -180,8 +180,10 @@ func (session *Session) createActionLog(actionName string, actionBody map[string
 
 func (session *Session) getData() map[string]interface{} {
 	actionLogData := []map[string]interface{}{}
-	for _, actionLog := range session.actionLog {
-		actionLogData = append(actionLogData, actionLog.GetData())
+	for i, actionLog := range session.actionLog {
+		actionData := actionLog.GetData()
+		actionData["order"] = i
+		actionLogData = append(actionLogData, actionData)
 	}
 	return map[string]interface{}{
 		"id":                session.id,
@@ -202,9 +204,12 @@ func (session *Session) changeState(newState ISessionState) {
 	}
 
 	session.state = newState
-	_, ok := session.state.(*EndState)
+	timedState, isTimed := newState.(ITimedState)
+	endState, ok := session.state.(*EndState)
 	if ok {
-		session.processEndResult()
+		session.processEndResult(endState)
+	} else if isTimed {
+		time.AfterFunc(time.Until(timedState.getDeadline()), timedState.expire)
 	}
 
 	notifier := notifiers.GetSessionNotifier()
@@ -261,10 +266,12 @@ func (session *Session) RunSessionSync() {
 	session.lock.Lock()
 	defer session.lock.Unlock()
 	session.running = true
-	session.state = &PreparationState{
+	newState := &PreparationState{
 		session:  session,
 		deadline: time.Now().Add(preparationTime),
 	}
+	session.state = newState
+	time.AfterFunc(time.Until(newState.deadline), newState.expire)
 }
 
 func (session *Session) GetRunningSync() bool {
@@ -304,18 +311,18 @@ func (session *Session) StartBattleSync() error {
 	return session.state.startBattle()
 }
 
-func (session *Session) ExecuteActionSync(actionName string, actionBody map[string]interface{}) (map[string]interface{}, error) {
+func (session *Session) ExecuteActionSync(actionName string, actionBody map[string]interface{}) error {
 	session.lock.Lock()
 	defer session.lock.Unlock()
 	action, err := session.createActionLog(actionName, actionBody)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	err = session.state.executeAction(action)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return action.GetData(), nil
+	return nil
 }
 
 func (session *Session) EndTurnSync(playerId string) error {

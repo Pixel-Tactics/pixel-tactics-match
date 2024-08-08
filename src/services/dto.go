@@ -9,8 +9,8 @@ type CreateSessionRequestDTO struct {
 	OpponentId string `json:"opponentId"`
 }
 
-type GetSessionRequestDTO struct {
-	SessionId string `json:"sessionId"`
+type PlayerIdDTO struct {
+	PlayerId string `json:"playerId"`
 }
 
 type GetSessionResponseDTO struct {

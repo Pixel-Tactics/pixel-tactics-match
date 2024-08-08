@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 
-	"pixeltactics.com/match/src/notifiers"
 	"pixeltactics.com/match/src/services"
 	"pixeltactics.com/match/src/utils"
 	ws_types "pixeltactics.com/match/src/websocket/types"
@@ -14,14 +13,33 @@ type SessionHandler struct {
 	Interaction  chan *ws_types.Interaction
 }
 
-func (handler *SessionHandler) GetSession(req *ws_types.Request, res *ws_types.Response) {
-	var body services.GetSessionRequestDTO
+func (handler *SessionHandler) GetIsPlayerInSession(req *ws_types.Request, res *ws_types.Response) {
+	var body services.PlayerIdDTO
 	err := utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
 		res.SendToClient(utils.ErrorMessage(err))
 		return
 	}
-	session, err := handler.matchService.GetSession(body)
+
+	_, err = handler.matchService.GetPlayerSession(body.PlayerId)
+	res.SendToClient(&ws_types.Message{
+		Action:     ws_types.ACTION_FEEDBACK,
+		Identifier: req.Message.Identifier,
+		Body: map[string]interface{}{
+			"inSession": err == nil,
+		},
+	})
+}
+
+func (handler *SessionHandler) GetSession(req *ws_types.Request, res *ws_types.Response) {
+	var body services.PlayerIdDTO
+	err := utils.MapToObject(req.Message.Body, &body)
+	if err != nil {
+		res.SendToClient(utils.ErrorMessage(err))
+		return
+	}
+
+	session, err := handler.matchService.GetPlayerSession(body.PlayerId)
 	if err != nil {
 		res.SendToClient(utils.ErrorMessage(err))
 		return
@@ -116,32 +134,11 @@ func (handler *SessionHandler) ExecuteAction(req *ws_types.Request, res *ws_type
 		return
 	}
 
-	opponentId, err := handler.matchService.GetOpponentId(body.PlayerId)
+	err = handler.matchService.ExecuteAction(body)
 	if err != nil {
 		res.SendToClient(utils.ErrorMessage(err))
 		return
 	}
-
-	action, err := handler.matchService.ExecuteAction(body)
-	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
-		return
-	}
-
-	res.NotifyClient(&ws_types.Message{
-		Action: ws_types.ACTION_APPLY_ACTION,
-		Body: map[string]interface{}{
-			"actionName":     body.ActionName,
-			"actionSpecific": action,
-		},
-	})
-	res.NotifyOtherClient(opponentId, &ws_types.Message{
-		Action: ws_types.ACTION_APPLY_ACTION,
-		Body: map[string]interface{}{
-			"actionName":     body.ActionName,
-			"actionSpecific": action,
-		},
-	})
 }
 
 func (handler *SessionHandler) EndTurn(req *ws_types.Request, res *ws_types.Response) {
@@ -181,7 +178,9 @@ func (handler *SessionHandler) Run() {
 		req := interaction.Request
 		res := interaction.Response
 		if ok {
-			if req.Message.Action == ws_types.ACTION_GET_SESSION {
+			if req.Message.Action == ws_types.ACTION_IS_IN_SESSION {
+				handler.GetIsPlayerInSession(req, res)
+			} else if req.Message.Action == ws_types.ACTION_GET_SESSION {
 				handler.GetSession(req, res)
 			} else if req.Message.Action == ws_types.ACTION_CREATE_SESSION {
 				handler.CreateSession(req, res)
@@ -194,28 +193,6 @@ func (handler *SessionHandler) Run() {
 			} else if req.Message.Action == ws_types.ACTION_END_TURN {
 				handler.EndTurn(req, res)
 			}
-			handler.handleNotifierChannel(res)
-		}
-	}
-}
-
-func (handler *SessionHandler) handleNotifierChannel(res *ws_types.Response) {
-	notifier := notifiers.GetSessionNotifier()
-	for {
-		isBreak := false
-		select {
-		case msg, ok := <-notifier.SendChannel:
-			if ok {
-				playerId := msg.PlayerId
-				message := msg.Message
-				res.NotifyOtherClient(playerId, &message)
-			}
-		default:
-			isBreak = true
-		}
-
-		if isBreak {
-			break
 		}
 	}
 }
