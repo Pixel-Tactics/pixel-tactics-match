@@ -3,6 +3,7 @@ package services
 import (
 	"time"
 
+	"pixeltactics.com/match/src/dto"
 	"pixeltactics.com/match/src/exceptions"
 	"pixeltactics.com/match/src/matches"
 	matches_interfaces "pixeltactics.com/match/src/matches/interfaces"
@@ -14,7 +15,7 @@ type MatchService struct {
 	templateRepository *repositories.TemplateRepository
 }
 
-func (service *MatchService) CreateSession(data CreateSessionRequestDTO) (*matches.Session, error) {
+func (service *MatchService) CreateSession(data dto.CreateSessionRequestDTO) (*matches.Session, error) {
 	// TODO: check by fetch from account service (to check opponent if they exists)
 	session, err := service.sessionRepository.CreateSession(data.PlayerId, data.OpponentId)
 	if err != nil {
@@ -33,7 +34,7 @@ func (service *MatchService) GetPlayerSession(playerId string) (map[string]inter
 	return session.GetDataSync(), nil
 }
 
-func (service *MatchService) PreparePlayer(data PreparePlayerRequestDTO) (bool, error) {
+func (service *MatchService) PreparePlayer(data dto.PreparePlayerRequestDTO) (bool, error) {
 	session := service.sessionRepository.GetSessionByPlayerId(data.PlayerId)
 	if session == nil {
 		return false, exceptions.SessionNotFound()
@@ -59,7 +60,7 @@ func (service *MatchService) PreparePlayer(data PreparePlayerRequestDTO) (bool, 
 	}
 }
 
-func (service *MatchService) ExecuteAction(data ExecuteActionRequestDTO) error {
+func (service *MatchService) ExecuteAction(data dto.ExecuteActionRequestDTO) error {
 	session := service.sessionRepository.GetSessionByPlayerId(data.PlayerId)
 	if session == nil {
 		return exceptions.SessionNotFound()

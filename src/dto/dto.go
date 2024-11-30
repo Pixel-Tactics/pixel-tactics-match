@@ -1,4 +1,4 @@
-package services
+package dto
 
 import (
 	matches_maps "pixeltactics.com/match/src/matches/maps"

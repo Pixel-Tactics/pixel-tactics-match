@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 
+	"pixeltactics.com/match/src/dto"
 	"pixeltactics.com/match/src/services"
 	convert_utils "pixeltactics.com/match/src/utils/convert"
 	"pixeltactics.com/match/src/utils/responses"
@@ -15,7 +16,7 @@ type SessionHandler struct {
 }
 
 func (handler *SessionHandler) GetIsPlayerInSession(req *ws_types.Request, res *ws_types.Response) {
-	var body services.PlayerIdDTO
+	var body dto.PlayerIdDTO
 	err := convert_utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
 		res.SendToClient(responses.ErrorMessage(err))
@@ -33,7 +34,7 @@ func (handler *SessionHandler) GetIsPlayerInSession(req *ws_types.Request, res *
 }
 
 func (handler *SessionHandler) GetSession(req *ws_types.Request, res *ws_types.Response) {
-	var body services.PlayerIdDTO
+	var body dto.PlayerIdDTO
 	err := convert_utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
 		res.SendToClient(responses.ErrorMessage(err))
@@ -54,7 +55,7 @@ func (handler *SessionHandler) GetSession(req *ws_types.Request, res *ws_types.R
 }
 
 func (handler *SessionHandler) CreateSession(req *ws_types.Request, res *ws_types.Response) {
-	var body services.CreateSessionRequestDTO
+	var body dto.CreateSessionRequestDTO
 	err := convert_utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
 		res.SendToClient(responses.ErrorMessage(err))
@@ -106,7 +107,7 @@ func (handler *SessionHandler) CreateSession(req *ws_types.Request, res *ws_type
 }
 
 func (handler *SessionHandler) PreparePlayer(req *ws_types.Request, res *ws_types.Response) {
-	var body services.PreparePlayerRequestDTO
+	var body dto.PreparePlayerRequestDTO
 	err := convert_utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
 		res.SendToClient(responses.ErrorMessage(err))
@@ -128,7 +129,7 @@ func (handler *SessionHandler) PreparePlayer(req *ws_types.Request, res *ws_type
 }
 
 func (handler *SessionHandler) ExecuteAction(req *ws_types.Request, res *ws_types.Response) {
-	var body services.ExecuteActionRequestDTO
+	var body dto.ExecuteActionRequestDTO
 	err := convert_utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
 		res.SendToClient(responses.ErrorMessage(err))
