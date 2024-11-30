@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 
+	"pixeltactics.com/match/src/config"
+	"pixeltactics.com/match/src/databases"
 	"pixeltactics.com/match/src/utils/cloud"
 	ws "pixeltactics.com/match/src/websocket/core"
 
@@ -11,7 +13,11 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load()
+	godotenv.Load()
+	config.Setup()
+
+	badger := databases.SetupBadger()
+	defer badger.Close()
 
 	clientHub := ws.NewClientHub()
 	go clientHub.Run()
