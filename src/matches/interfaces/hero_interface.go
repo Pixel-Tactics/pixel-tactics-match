@@ -1,6 +1,6 @@
 package matches_interfaces
 
-import matches_physics "pixeltactics.com/match/src/matches/physics"
+import matches_physics "pixeltactics.com/match/src/utils/physics"
 
 type IHero interface {
 	CanMove() bool

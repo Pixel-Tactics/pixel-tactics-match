@@ -1,6 +1,6 @@
 package matches_maps
 
-import matches_physics "pixeltactics.com/match/src/matches/physics"
+import matches_physics "pixeltactics.com/match/src/utils/physics"
 
 // 0 = Background
 // 1 = Land

@@ -2,7 +2,7 @@ package matches_interfaces
 
 import (
 	matches_maps "pixeltactics.com/match/src/matches/maps"
-	matches_physics "pixeltactics.com/match/src/matches/physics"
+	matches_physics "pixeltactics.com/match/src/utils/physics"
 )
 
 type ISession interface {

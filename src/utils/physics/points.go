@@ -1,4 +1,4 @@
-package matches_physics
+package physics
 
 const (
 	DIRECTION_UP    = "UP"

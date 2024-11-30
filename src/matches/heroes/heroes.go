@@ -3,7 +3,7 @@ package matches_heroes
 import (
 	matches_constants "pixeltactics.com/match/src/matches/constants"
 	matches_interfaces "pixeltactics.com/match/src/matches/interfaces"
-	matches_physics "pixeltactics.com/match/src/matches/physics"
+	matches_physics "pixeltactics.com/match/src/utils/physics"
 )
 
 type Hero struct {

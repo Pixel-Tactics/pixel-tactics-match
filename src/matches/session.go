@@ -12,10 +12,10 @@ import (
 	matches_heroes "pixeltactics.com/match/src/matches/heroes"
 	matches_interfaces "pixeltactics.com/match/src/matches/interfaces"
 	matches_maps "pixeltactics.com/match/src/matches/maps"
-	matches_physics "pixeltactics.com/match/src/matches/physics"
 	matches_players "pixeltactics.com/match/src/matches/players"
 	"pixeltactics.com/match/src/notifiers"
 	convert_utils "pixeltactics.com/match/src/utils/convert"
+	matches_physics "pixeltactics.com/match/src/utils/physics"
 )
 
 type Session struct {

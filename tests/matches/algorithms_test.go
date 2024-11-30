@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	matches_algorithms "pixeltactics.com/match/src/matches/algorithms"
-	matches_physics "pixeltactics.com/match/src/matches/physics"
+	matches_physics "pixeltactics.com/match/src/utils/physics"
 )
 
 func TestCheckDistance(t *testing.T) {

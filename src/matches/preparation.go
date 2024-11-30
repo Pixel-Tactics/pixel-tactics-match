@@ -7,7 +7,7 @@ import (
 	"pixeltactics.com/match/src/exceptions"
 	matches_heroes "pixeltactics.com/match/src/matches/heroes"
 	matches_interfaces "pixeltactics.com/match/src/matches/interfaces"
-	matches_physics "pixeltactics.com/match/src/matches/physics"
+	matches_physics "pixeltactics.com/match/src/utils/physics"
 )
 
 type PreparationState struct {

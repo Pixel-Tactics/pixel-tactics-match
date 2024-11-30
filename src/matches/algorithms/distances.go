@@ -5,7 +5,7 @@ import (
 
 	llq "github.com/emirpasic/gods/queues/linkedlistqueue"
 
-	physics "pixeltactics.com/match/src/matches/physics"
+	physics "pixeltactics.com/match/src/utils/physics"
 )
 
 type BFSElement struct {
