@@ -3,7 +3,7 @@ package matches_test
 import (
 	"testing"
 
-	matches_algorithms "pixeltactics.com/match/src/matches/algorithms"
+	matches_algorithms "pixeltactics.com/match/src/utils/algorithms"
 	matches_physics "pixeltactics.com/match/src/utils/physics"
 )
 

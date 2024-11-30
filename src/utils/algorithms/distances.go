@@ -1,4 +1,4 @@
-package matches_algorithms
+package algorithms
 
 import (
 	"errors"

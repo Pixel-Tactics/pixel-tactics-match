@@ -3,9 +3,9 @@ package matches_actions
 import (
 	"errors"
 
-	matches_algorithms "pixeltactics.com/match/src/matches/algorithms"
 	matches_constants "pixeltactics.com/match/src/matches/constants"
 	matches_interfaces "pixeltactics.com/match/src/matches/interfaces"
+	matches_algorithms "pixeltactics.com/match/src/utils/algorithms"
 )
 
 type AttackLog struct {
