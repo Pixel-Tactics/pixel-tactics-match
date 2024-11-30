@@ -10,6 +10,8 @@ type Hero struct {
 	Position       physics.Point `json:"pos"`
 	LastMoveTurn   int
 	LastAttackTurn int
-	PlayerUsername string
 	BaseHero       heroes.BaseHeroEnum
+
+	PlayerUsername string
+	SessionId      string
 }

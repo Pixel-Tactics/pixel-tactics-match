@@ -11,10 +11,11 @@ const (
 )
 
 type Session struct {
-	Id       string
-	Turn     int
-	State    SessionState
-	HeroList []string
+	Id             string
+	Turn           int
+	State          SessionState
+	HeroList       []string
+	PlayerUsername []string
 }
 
 func (session *Session) IsRunning() bool {

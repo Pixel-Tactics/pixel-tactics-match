@@ -16,7 +16,7 @@ func main() {
 	godotenv.Load()
 	config.Setup()
 
-	badger := databases.SetupBadger()
+	badger := databases.NewBadgerImpl()
 	defer badger.Close()
 
 	clientHub := ws.NewClientHub()
