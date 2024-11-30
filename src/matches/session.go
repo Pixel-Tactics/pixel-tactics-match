@@ -15,7 +15,7 @@ import (
 	matches_physics "pixeltactics.com/match/src/matches/physics"
 	matches_players "pixeltactics.com/match/src/matches/players"
 	"pixeltactics.com/match/src/notifiers"
-	"pixeltactics.com/match/src/utils"
+	convert_utils "pixeltactics.com/match/src/utils/convert"
 )
 
 type Session struct {
@@ -140,7 +140,7 @@ func (session *Session) processEndResult(endState *EndState) {
 func (session *Session) createActionLog(actionName string, actionBody map[string]interface{}) (matches_interfaces.IAction, error) {
 	if actionName == "move" {
 		var action matches_actions.MoveLogData
-		err := utils.MapToObject(actionBody, &action)
+		err := convert_utils.MapToObject(actionBody, &action)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +153,7 @@ func (session *Session) createActionLog(actionName string, actionBody map[string
 		return matches_actions.NewMoveLog(hero, action.DirectionList), nil
 	} else if actionName == "attack" {
 		var action matches_actions.AttackLogData
-		err := utils.MapToObject(actionBody, &action)
+		err := convert_utils.MapToObject(actionBody, &action)
 		if err != nil {
 			return nil, err
 		}

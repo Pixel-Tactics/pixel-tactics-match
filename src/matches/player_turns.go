@@ -6,7 +6,7 @@ import (
 	"pixeltactics.com/match/src/exceptions"
 	matches_interfaces "pixeltactics.com/match/src/matches/interfaces"
 	"pixeltactics.com/match/src/notifiers"
-	"pixeltactics.com/match/src/utils"
+	time_utils "pixeltactics.com/match/src/utils/time"
 )
 
 // Player 1 Turn
@@ -63,7 +63,7 @@ func (state *Player1TurnState) endTurn(playerId string) error {
 	if state.session.player1.Id == playerId {
 		state.session.changeState(&Player2TurnState{
 			session:  state.session,
-			deadline: utils.MinTime(time.Now(), state.deadline).Add(playerTurnTime),
+			deadline: time_utils.MinTime(time.Now(), state.deadline).Add(playerTurnTime),
 		})
 		return nil
 	} else {
@@ -170,7 +170,7 @@ func (state *Player2TurnState) endTurn(playerId string) error {
 	if state.session.player2.Id == playerId {
 		state.session.changeState(&Player1TurnState{
 			session:  state.session,
-			deadline: utils.MinTime(time.Now(), state.deadline).Add(playerTurnTime),
+			deadline: time_utils.MinTime(time.Now(), state.deadline).Add(playerTurnTime),
 		})
 		return nil
 	} else {

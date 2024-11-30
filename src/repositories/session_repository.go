@@ -9,12 +9,12 @@ import (
 	"pixeltactics.com/match/src/matches"
 	matches_heroes_templates "pixeltactics.com/match/src/matches/heroes/templates"
 	matches_maps "pixeltactics.com/match/src/matches/maps"
-	"pixeltactics.com/match/src/utils"
+	"pixeltactics.com/match/src/utils/datastructures"
 )
 
 type SessionRepository struct {
-	sessions      *utils.SyncMap[string, *matches.Session]
-	playerSession *utils.SyncMap[string, *matches.Session]
+	sessions      *datastructures.SyncMap[string, *matches.Session]
+	playerSession *datastructures.SyncMap[string, *matches.Session]
 }
 
 func (repo *SessionRepository) GetSessionById(id string) *matches.Session {
@@ -146,8 +146,8 @@ var onceSession sync.Once
 func GetSessionRepository() *SessionRepository {
 	onceSession.Do(func() {
 		sessionRepository = &SessionRepository{
-			sessions:      utils.NewSyncMap[string, *matches.Session](),
-			playerSession: utils.NewSyncMap[string, *matches.Session](),
+			sessions:      datastructures.NewSyncMap[string, *matches.Session](),
+			playerSession: datastructures.NewSyncMap[string, *matches.Session](),
 		}
 	})
 	return sessionRepository

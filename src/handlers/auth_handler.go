@@ -6,7 +6,8 @@ import (
 
 	"pixeltactics.com/match/src/exceptions"
 	integration_users "pixeltactics.com/match/src/integrations/users"
-	"pixeltactics.com/match/src/utils"
+	convert_utils "pixeltactics.com/match/src/utils/convert"
+	"pixeltactics.com/match/src/utils/responses"
 	ws_types "pixeltactics.com/match/src/websocket/types"
 )
 
@@ -22,9 +23,9 @@ type AuthHandler struct {
 
 func (handler *AuthHandler) AuthenticateClient(req *ws_types.Request, res *ws_types.Response) {
 	var body AuthMessageBody
-	err := utils.MapToObject(req.Message.Body, &body)
+	err := convert_utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(responses.ErrorMessage(err))
 		return
 	}
 
@@ -79,7 +80,7 @@ func (handler *AuthHandler) handleError(req *ws_types.Request, res *ws_types.Res
 		return
 	}
 
-	res.SendToClient(utils.ErrorMessage(errors.New(msg)))
+	res.SendToClient(responses.ErrorMessage(errors.New(msg)))
 }
 
 func (handler *AuthHandler) sendAuthRequest(playerToken string, res *ws_types.Response) {

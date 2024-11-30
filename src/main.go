@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"pixeltactics.com/match/src/utils"
+	"pixeltactics.com/match/src/utils/cloud"
 	ws "pixeltactics.com/match/src/websocket/core"
 
 	"github.com/gin-gonic/gin"
@@ -26,7 +26,7 @@ func main() {
 
 	router.GET("/region", func(context *gin.Context) {
 		context.JSON(http.StatusOK, map[string]string{
-			"region": utils.GetServerRegion(),
+			"region": cloud.GetServerRegion(),
 		})
 	})
 

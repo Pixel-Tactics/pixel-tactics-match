@@ -4,7 +4,8 @@ import (
 	"errors"
 
 	"pixeltactics.com/match/src/services"
-	"pixeltactics.com/match/src/utils"
+	convert_utils "pixeltactics.com/match/src/utils/convert"
+	"pixeltactics.com/match/src/utils/responses"
 	ws_types "pixeltactics.com/match/src/websocket/types"
 )
 
@@ -15,9 +16,9 @@ type SessionHandler struct {
 
 func (handler *SessionHandler) GetIsPlayerInSession(req *ws_types.Request, res *ws_types.Response) {
 	var body services.PlayerIdDTO
-	err := utils.MapToObject(req.Message.Body, &body)
+	err := convert_utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(responses.ErrorMessage(err))
 		return
 	}
 
@@ -33,15 +34,15 @@ func (handler *SessionHandler) GetIsPlayerInSession(req *ws_types.Request, res *
 
 func (handler *SessionHandler) GetSession(req *ws_types.Request, res *ws_types.Response) {
 	var body services.PlayerIdDTO
-	err := utils.MapToObject(req.Message.Body, &body)
+	err := convert_utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(responses.ErrorMessage(err))
 		return
 	}
 
 	session, err := handler.matchService.GetPlayerSession(body.PlayerId)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(responses.ErrorMessage(err))
 		return
 	}
 
@@ -54,20 +55,20 @@ func (handler *SessionHandler) GetSession(req *ws_types.Request, res *ws_types.R
 
 func (handler *SessionHandler) CreateSession(req *ws_types.Request, res *ws_types.Response) {
 	var body services.CreateSessionRequestDTO
-	err := utils.MapToObject(req.Message.Body, &body)
+	err := convert_utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(responses.ErrorMessage(err))
 		return
 	}
 
 	if body.PlayerId == body.OpponentId {
-		res.SendToClient(utils.ErrorMessage(errors.New("invalid opponent")))
+		res.SendToClient(responses.ErrorMessage(errors.New("invalid opponent")))
 		return
 	}
 
 	session, err := handler.matchService.CreateSession(body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(responses.ErrorMessage(err))
 		return
 	}
 
@@ -106,15 +107,15 @@ func (handler *SessionHandler) CreateSession(req *ws_types.Request, res *ws_type
 
 func (handler *SessionHandler) PreparePlayer(req *ws_types.Request, res *ws_types.Response) {
 	var body services.PreparePlayerRequestDTO
-	err := utils.MapToObject(req.Message.Body, &body)
+	err := convert_utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(responses.ErrorMessage(err))
 		return
 	}
 
 	_, err = handler.matchService.PreparePlayer(body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(responses.ErrorMessage(err))
 		return
 	}
 
@@ -128,15 +129,15 @@ func (handler *SessionHandler) PreparePlayer(req *ws_types.Request, res *ws_type
 
 func (handler *SessionHandler) ExecuteAction(req *ws_types.Request, res *ws_types.Response) {
 	var body services.ExecuteActionRequestDTO
-	err := utils.MapToObject(req.Message.Body, &body)
+	err := convert_utils.MapToObject(req.Message.Body, &body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(responses.ErrorMessage(err))
 		return
 	}
 
 	err = handler.matchService.ExecuteAction(body)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(responses.ErrorMessage(err))
 		return
 	}
 }
@@ -144,18 +145,18 @@ func (handler *SessionHandler) ExecuteAction(req *ws_types.Request, res *ws_type
 func (handler *SessionHandler) EndTurn(req *ws_types.Request, res *ws_types.Response) {
 	playerIdInterface, ok := req.Message.Body["playerId"]
 	if !ok {
-		res.SendToClient(utils.ErrorMessage(errors.New("no player id")))
+		res.SendToClient(responses.ErrorMessage(errors.New("no player id")))
 		return
 	}
 	playerId, ok := playerIdInterface.(string)
 	if !ok {
-		res.SendToClient(utils.ErrorMessage(errors.New("player id must be a string")))
+		res.SendToClient(responses.ErrorMessage(errors.New("player id must be a string")))
 		return
 	}
 
 	err := handler.matchService.EndTurn(playerId)
 	if err != nil {
-		res.SendToClient(utils.ErrorMessage(err))
+		res.SendToClient(responses.ErrorMessage(err))
 		return
 	}
 }

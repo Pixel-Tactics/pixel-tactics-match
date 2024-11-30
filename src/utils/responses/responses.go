@@ -1,4 +1,4 @@
-package utils
+package responses
 
 import (
 	ws_types "pixeltactics.com/match/src/websocket/types"
