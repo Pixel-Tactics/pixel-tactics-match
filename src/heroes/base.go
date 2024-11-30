@@ -8,7 +8,7 @@ const (
 )
 
 type BaseHero interface {
-	GetInfo() BaseHeroInfo
+	GetInfo() *BaseHeroInfo
 }
 
 type BaseHeroInfo struct {

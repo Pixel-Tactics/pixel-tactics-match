@@ -10,7 +10,11 @@ const (
 	SESSIONID_TO_MAP = BASE_PLAYER_PREFIX + "session_"
 )
 
-type MapRepository interface{}
+type MapRepository interface {
+	GetMapBySessionId(sessionId string) *models.Map
+	CreateMap(params CreateMapParams) (*models.Map, error)
+	DeleteMap(sessionId string) error
+}
 
 type CreateMapParams struct {
 	SessionId string

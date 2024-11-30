@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"errors"
+
 	"github.com/google/uuid"
 	"pixeltactics.com/match/src/databases"
 	"pixeltactics.com/match/src/models"
@@ -12,12 +14,25 @@ const (
 	PLAYERID_TO_SESSION   string = BASE_SESSION_PREFIX + "username_"
 )
 
-type SessionRepositoryV2 interface{}
+type SessionRepositoryV2 interface {
+	GetSessionById(sessionId string) *models.Session
+	GetSessionByPlayerId(playerId string) *models.Session
+	CreateSession(params CreateSessionParams) (*models.Session, error)
+	UpdateSession(params UpdateSessionParams) (*models.Session, error)
+	DeleteSession(sessionId string) error
+}
 
 type CreateSessionParams struct {
-	Username1 string
-	Username2 string
-	HeroList  []string
+	PlayerId1         string
+	PlayerId2         string
+	AvailableHeroList []string
+	State             models.State
+}
+
+type UpdateSessionParams struct {
+	SessionId string
+	State     models.State
+	WinnerId  *string
 }
 
 type SessionRepositoryV2Impl struct {
@@ -50,12 +65,15 @@ func (repo *SessionRepositoryV2Impl) GetSessionByPlayerId(playerId string) *mode
 func (repo *SessionRepositoryV2Impl) CreateSession(params CreateSessionParams) (*models.Session, error) {
 	sessionId := uuid.New().String()
 	session := &models.Session{
-		Id:       sessionId,
-		State:    models.SessionStateMatchMaking,
-		HeroList: params.HeroList,
+		Id: sessionId,
+		State: models.State{
+			Id:   uuid.New().String(),
+			Type: models.SessionStateMatchMaking,
+		},
+		AllowedHeroList: params.AvailableHeroList,
 		PlayerIds: []string{
-			params.Username1,
-			params.Username2,
+			params.PlayerId1,
+			params.PlayerId2,
 		},
 	}
 	err := repo.badger.BatchSet([]*databases.BadgerSetParams{
@@ -72,6 +90,22 @@ func (repo *SessionRepositoryV2Impl) CreateSession(params CreateSessionParams) (
 			Value: sessionId,
 		},
 	})
+	if err != nil {
+		return nil, err
+	}
+	return session, nil
+}
+
+func (repo *SessionRepositoryV2Impl) UpdateSession(params UpdateSessionParams) (*models.Session, error) {
+	session := repo.GetSessionById(params.SessionId)
+	if session == nil {
+		return nil, errors.New("invalid session id")
+	}
+
+	session.State = params.State
+	session.WinnerId = params.WinnerId
+
+	err := repo.badger.Set(SESSION_ID_TO_SESSION+params.SessionId, session)
 	if err != nil {
 		return nil, err
 	}

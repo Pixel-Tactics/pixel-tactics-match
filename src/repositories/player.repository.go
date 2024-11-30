@@ -1,7 +1,10 @@
 package repositories
 
 import (
+	"errors"
+
 	"pixeltactics.com/match/src/databases"
+	"pixeltactics.com/match/src/heroes"
 	"pixeltactics.com/match/src/models"
 )
 
@@ -10,11 +13,22 @@ const (
 	PLAYERID_SESSIONID_TO_PLAYER = BASE_PLAYER_PREFIX + "sessid_pid_"
 )
 
-type PlayerRepository interface{}
+type PlayerRepository interface {
+	GetPlayerByIdAndSessionId(playerId string, sessionId string) *models.Player
+	CreatePlayer(params CreatePlayerParams) (*models.Player, error)
+	UpdatePlayer(params UpdatePlayerParams) (*models.Player, error)
+	DeletePlayer(playerId string, sessionId string) error
+}
 
 type CreatePlayerParams struct {
 	Id        string
 	SessionId string
+}
+
+type UpdatePlayerParams struct {
+	SessionId string
+	PlayerId  string
+	HeroBases []heroes.BaseHeroEnum
 }
 
 type PlayerRepositoryImpl struct {
@@ -36,6 +50,21 @@ func (repo *PlayerRepositoryImpl) CreatePlayer(params CreatePlayerParams) (*mode
 		SessionId: params.SessionId,
 	}
 	err := repo.badger.Set(PLAYERID_SESSIONID_TO_PLAYER+params.SessionId+"_"+params.Id, player)
+	if err != nil {
+		return nil, err
+	}
+	return player, nil
+}
+
+func (repo *PlayerRepositoryImpl) UpdatePlayer(params UpdatePlayerParams) (*models.Player, error) {
+	player := repo.GetPlayerByIdAndSessionId(params.PlayerId, params.SessionId)
+	if player == nil {
+		return nil, errors.New("invalid player key")
+	}
+
+	player.HeroBases = params.HeroBases
+
+	err := repo.badger.Set(PLAYERID_SESSIONID_TO_PLAYER+params.SessionId+"_"+params.PlayerId, player)
 	if err != nil {
 		return nil, err
 	}
