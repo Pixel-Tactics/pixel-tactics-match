@@ -12,6 +12,6 @@ type Hero struct {
 	LastAttackTurn int
 	BaseHero       heroes.BaseHeroEnum
 
-	PlayerUsername string
-	SessionId      string
+	PlayerId  string
+	SessionId string
 }

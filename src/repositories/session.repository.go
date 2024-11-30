@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	BASE_PREFIX           string = "session_"
-	SESSION_ID_TO_SESSION string = BASE_PREFIX + "id_"
-	USERNAME_TO_SESSION   string = BASE_PREFIX + "username_"
+	BASE_SESSION_PREFIX   string = "session_"
+	SESSION_ID_TO_SESSION string = BASE_SESSION_PREFIX + "id_"
+	PLAYERID_TO_SESSION   string = BASE_SESSION_PREFIX + "username_"
 )
 
 type SessionRepositoryV2 interface{}
@@ -33,9 +33,9 @@ func (repo *SessionRepositoryV2Impl) GetSessionById(sessionId string) *models.Se
 	return &session
 }
 
-func (repo *SessionRepositoryV2Impl) GetSessionByUsername(username string) *models.Session {
+func (repo *SessionRepositoryV2Impl) GetSessionByPlayerId(playerId string) *models.Session {
 	var sessionId string
-	err := repo.badger.Get(USERNAME_TO_SESSION+username, &sessionId)
+	err := repo.badger.Get(PLAYERID_TO_SESSION+playerId, &sessionId)
 	if err != nil {
 		return nil
 	}
@@ -53,7 +53,7 @@ func (repo *SessionRepositoryV2Impl) CreateSession(params CreateSessionParams) (
 		Id:       sessionId,
 		State:    models.SessionStateMatchMaking,
 		HeroList: params.HeroList,
-		PlayerUsername: []string{
+		PlayerIds: []string{
 			params.Username1,
 			params.Username2,
 		},
@@ -64,11 +64,11 @@ func (repo *SessionRepositoryV2Impl) CreateSession(params CreateSessionParams) (
 			Value: session,
 		},
 		{
-			Key:   USERNAME_TO_SESSION + session.PlayerUsername[0],
+			Key:   PLAYERID_TO_SESSION + session.PlayerIds[0],
 			Value: sessionId,
 		},
 		{
-			Key:   USERNAME_TO_SESSION + session.PlayerUsername[1],
+			Key:   PLAYERID_TO_SESSION + session.PlayerIds[1],
 			Value: sessionId,
 		},
 	})
@@ -89,10 +89,10 @@ func (repo *SessionRepositoryV2Impl) DeleteSession(sessionId string) error {
 			Key: SESSION_ID_TO_SESSION + sessionId,
 		},
 		{
-			Key: USERNAME_TO_SESSION + session.PlayerUsername[0],
+			Key: PLAYERID_TO_SESSION + session.PlayerIds[0],
 		},
 		{
-			Key: USERNAME_TO_SESSION + session.PlayerUsername[1],
+			Key: PLAYERID_TO_SESSION + session.PlayerIds[1],
 		},
 	})
 }

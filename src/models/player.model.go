@@ -1,6 +1,6 @@
 package models
 
 type Player struct {
-	Username  string
+	Id        string
 	SessionId string
 }
