@@ -8,11 +8,10 @@ import (
 )
 
 type Badger interface {
-	Get(key string, dest interface{}) error
-	Set(key string, value interface{}) error
-	BatchSet(params []*BadgerSetParams) error
-	Delete(key string) error
-	BatchDelete(params []*BadgerDeleteParams) error
+	NewReadTransaction() BadgerTx
+	NewReadWriteTransaction() BadgerTx
+	BadgerQuery
+	BadgerBatchQuery
 }
 
 type BadgerSetParams struct {
@@ -26,6 +25,18 @@ type BadgerDeleteParams struct {
 
 type BadgerImpl struct {
 	badger *badger.DB
+}
+
+func (db *BadgerImpl) NewReadTransaction() BadgerTx {
+	return &BadgerTxImpl{
+		Txn: db.badger.NewTransaction(false),
+	}
+}
+
+func (db *BadgerImpl) NewReadWriteTransaction() BadgerTx {
+	return &BadgerTxImpl{
+		Txn: db.badger.NewTransaction(false),
+	}
 }
 
 func (db *BadgerImpl) Get(key string, dest interface{}) error {
