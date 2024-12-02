@@ -1,10 +1,17 @@
 package physics
 
+type Direction = string
+
 const (
 	DIRECTION_UP    = "UP"
 	DIRECTION_DOWN  = "DOWN"
 	DIRECTION_LEFT  = "LEFT"
 	DIRECTION_RIGHT = "RIGHT"
+
+	DirectionUp    Direction = "UP"
+	DirectionDown  Direction = "DOWN"
+	DirectionLeft  Direction = "LEFT"
+	DirectionRight Direction = "RIGHT"
 )
 
 type Point struct {

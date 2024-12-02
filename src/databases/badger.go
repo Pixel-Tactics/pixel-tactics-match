@@ -10,6 +10,7 @@ import (
 type Badger interface {
 	NewReadTransaction() BadgerTx
 	NewReadWriteTransaction() BadgerTx
+	Close()
 	BadgerQuery
 	BadgerBatchQuery
 }
@@ -35,7 +36,7 @@ func (db *BadgerImpl) NewReadTransaction() BadgerTx {
 
 func (db *BadgerImpl) NewReadWriteTransaction() BadgerTx {
 	return &BadgerTxImpl{
-		Txn: db.badger.NewTransaction(false),
+		Txn: db.badger.NewTransaction(true),
 	}
 }
 
