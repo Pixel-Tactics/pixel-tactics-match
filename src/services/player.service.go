@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 
+	"pixeltactics.com/match/src/databases"
 	"pixeltactics.com/match/src/exceptions"
 	"pixeltactics.com/match/src/heroes"
 	"pixeltactics.com/match/src/models"
@@ -12,17 +13,18 @@ import (
 type PlayerService interface {
 	GetPlayer(playerId string, sessionId string) *models.Player
 	CreatePlayerForSession(sessionId string, playerId1 string, playerId2 string) error
-	SetPlayerHeroes(sessionId string, playerId string, heroList []heroes.BaseHeroEnum) error
+	SetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string, heroList []heroes.BaseHeroEnum) error
 }
 
 type PlayerServiceImpl struct {
 	playerRepository repositories.PlayerRepository
 
-	sessionService SessionService
+	sessionService     SessionService
+	transactionManager databases.TransactionManager
 }
 
 func (service *PlayerServiceImpl) GetPlayer(playerId string, sessionId string) *models.Player {
-	return service.playerRepository.GetPlayerByIdAndSessionId(playerId, sessionId)
+	return service.playerRepository.GetPlayerByIdAndSessionId(nil, playerId, sessionId)
 }
 
 func (service *PlayerServiceImpl) CreatePlayerForSession(sessionId string, playerId1 string, playerId2 string) error {
@@ -31,9 +33,12 @@ func (service *PlayerServiceImpl) CreatePlayerForSession(sessionId string, playe
 		return exceptions.SessionNotFound()
 	}
 
+	tx := service.transactionManager.NewReadWriteTransaction()
+	defer tx.Discard()
+
 	// TODO: check if player really exists as multilayer protection
 
-	_, err := service.playerRepository.CreatePlayer(repositories.CreatePlayerParams{
+	_, err := service.playerRepository.CreatePlayer(tx, repositories.CreatePlayerParams{
 		Id:        playerId1,
 		SessionId: sessionId,
 	})
@@ -41,25 +46,30 @@ func (service *PlayerServiceImpl) CreatePlayerForSession(sessionId string, playe
 		return err
 	}
 
-	_, err = service.playerRepository.CreatePlayer(repositories.CreatePlayerParams{
+	_, err = service.playerRepository.CreatePlayer(tx, repositories.CreatePlayerParams{
 		Id:        playerId2,
 		SessionId: sessionId,
 	})
 	if err != nil {
-		service.playerRepository.DeletePlayer(playerId1, sessionId)
+		service.playerRepository.DeletePlayer(tx, playerId1, sessionId)
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (service *PlayerServiceImpl) SetPlayerHeroes(sessionId string, playerId string, heroList []heroes.BaseHeroEnum) error {
+func (service *PlayerServiceImpl) SetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string, heroList []heroes.BaseHeroEnum) error {
 	player := service.GetPlayer(playerId, sessionId)
 	if player == nil {
 		return errors.New("invalid player key")
 	}
 
-	_, err := service.playerRepository.UpdatePlayer(repositories.UpdatePlayerParams{
+	_, err := service.playerRepository.UpdatePlayer(tx, repositories.UpdatePlayerParams{
 		SessionId: sessionId,
 		PlayerId:  playerId,
 		HeroBases: heroList,

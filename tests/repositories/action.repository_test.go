@@ -47,7 +47,7 @@ func TestCreateActionLog(t *testing.T) {
 	_, err := repo.CreateActionLog(tx, expectedLog)
 	assert.Equal(t, err, nil)
 
-	tx.Commit()
+	_ = tx.Commit()
 
 	logs, err := repo.GetSessionActionLogs(nil, "testos")
 	assert.Equal(t, err, nil)
@@ -89,6 +89,6 @@ func seedActionLogs(db databases.Badger, repo repositories.ActionLogRepository) 
 		}
 		actionLogs = append(actionLogs, curLog)
 	}
-	tx.Commit()
+	_ = tx.Commit()
 	return actionLogs
 }

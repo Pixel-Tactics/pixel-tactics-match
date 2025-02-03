@@ -5,8 +5,9 @@ import (
 
 	"pixeltactics.com/match/src/core/actions"
 	"pixeltactics.com/match/src/core/states"
-	"pixeltactics.com/match/src/heroes"
+	"pixeltactics.com/match/src/databases"
 	"pixeltactics.com/match/src/models"
+	"pixeltactics.com/match/src/repositories"
 	"pixeltactics.com/match/src/utils/algorithms"
 )
 
@@ -20,10 +21,16 @@ type ActionServiceImpl struct {
 	playerService  PlayerService
 	sessionService SessionService
 
-	stateFactory states.SessionStateFactory
+	stateFactory       states.SessionStateFactory
+	actionRepository   repositories.ActionLogRepository
+	transactionManager databases.TransactionManager
 }
 
-func (service *ActionServiceImpl) Attack(actionLog *models.ActionLog, matchMap *models.Map, srcHeroes map[heroes.BaseHeroEnum]*models.Hero, trgHeroes map[heroes.BaseHeroEnum]*models.Hero) error {
+// func (service *ActionServiceImpl) Move(actionLog *models.ActionLog, matchMap *models.Map) error {
+
+// }
+
+func (service *ActionServiceImpl) Attack(actionLog *models.ActionLog, matchMap *models.Map) error {
 	session := service.sessionService.GetSessionById(actionLog.SessionId)
 	if session == nil {
 		return errors.New("invalid session id")
@@ -69,9 +76,23 @@ func (service *ActionServiceImpl) Attack(actionLog *models.ActionLog, matchMap *
 		return errors.New("target out of range")
 	}
 
+	tx := service.transactionManager.NewReadWriteTransaction()
+	defer tx.Discard()
+
 	action.Damage = damage
-	srcHero.LastAttackTurn = actionLog.Turn
-	trgHero.Health = max(trgHero.Health-damage, 0)
+	_, err = service.actionRepository.UpdateActionLog(tx, actionLog)
+	if err != nil {
+		return err
+	}
+	err = service.heroService.ApplyDamage(tx, actionLog.Order, srcHero, trgHero, damage)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

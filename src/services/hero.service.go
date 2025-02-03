@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 
+	"pixeltactics.com/match/src/databases"
 	"pixeltactics.com/match/src/exceptions"
 	"pixeltactics.com/match/src/heroes"
 	"pixeltactics.com/match/src/models"
@@ -21,6 +22,8 @@ type HeroService interface {
 	GetAvailableHeroes() []heroes.BaseHeroEnum
 	CreateHeroes(sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
 	InitHeroPosition(heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
+
+	ApplyDamage(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, trgHero *models.Hero, damage int) error
 }
 
 type HeroServiceImpl struct {
@@ -28,7 +31,8 @@ type HeroServiceImpl struct {
 	sessionService SessionService
 	playerService  PlayerService
 
-	heroFactory heroes.BaseHeroFactory
+	heroFactory        heroes.BaseHeroFactory
+	transactionManager databases.TransactionManager
 }
 
 func (service *HeroServiceImpl) GetPlayerHeroes(sessionId string, playerId string) ([]*models.Hero, error) {
@@ -37,26 +41,44 @@ func (service *HeroServiceImpl) GetPlayerHeroes(sessionId string, playerId strin
 		return nil, errors.New("invalid player")
 	}
 
-	return service.heroRepository.GetPlayerHeroes(sessionId, playerId, player.HeroBases)
+	return service.heroRepository.GetPlayerHeroes(nil, sessionId, playerId, player.HeroBases)
 }
 
-func (service *HeroServiceImpl) GetPlayerHero(sessionId string, playerId string, baseHero heroes.BaseHeroEnum) (*models.Hero, error) {
-	heroes, err := service.GetPlayerHeroes(sessionId, playerId)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, hero := range heroes {
-		if hero.BaseHero == baseHero {
-			return hero, nil
-		}
-	}
-	return nil, errors.New("hero not found")
+func (service *HeroServiceImpl) GetPlayerHero(sessionId string, playerId string, baseHero heroes.BaseHeroEnum) *models.Hero {
+	return service.heroRepository.GetHeroBySessionId(nil, repositories.HeroKey{
+		SessionId: sessionId,
+		PlayerId:  playerId,
+		BaseHero:  baseHero,
+	})
 }
 
 func (service *HeroServiceImpl) GetStats(heroName heroes.BaseHeroEnum) *heroes.BaseHeroInfo {
 	hero := service.heroFactory.Create(heroName)
 	return hero.GetInfo()
+}
+
+func (service *HeroServiceImpl) ApplyDamage(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, trgHero *models.Hero, damage int) error {
+	srcHero.LastAttackTurn = currentTurn
+	trgHero.Health = max(trgHero.Health-damage, 0)
+
+	// tx := service.transactionManager.NewReadWriteTransaction()
+	// defer tx.Discard()
+
+	_, err := service.heroRepository.SaveHero(tx, srcHero)
+	if err != nil {
+		return err
+	}
+	_, err = service.heroRepository.SaveHero(tx, trgHero)
+	if err != nil {
+		return err
+	}
+
+	// err = tx.Commit()
+	// if err != nil {
+	// 	return err
+	// }
+
+	return nil
 }
 
 func (service *HeroServiceImpl) GetAvailableHeroes() []heroes.BaseHeroEnum {
@@ -77,11 +99,13 @@ func (service *HeroServiceImpl) CreateHeroes(sessionId string, playerId string, 
 		return exceptions.HeroPickupError()
 	}
 
-	params := []repositories.CreateHeroParams{}
+	tx := service.transactionManager.NewReadWriteTransaction()
+	defer tx.Discard()
+
 	for _, heroEnum := range chosen {
 		baseHero := service.heroFactory.Create(heroEnum)
 		baseHeroInfo := baseHero.GetInfo()
-		params = append(params, repositories.CreateHeroParams{
+		_, err := service.heroRepository.SaveHero(tx, &models.Hero{
 			Health:         baseHeroInfo.BaseStats.MaxHealth,
 			LastMoveTurn:   -2,
 			LastAttackTurn: -2,
@@ -89,16 +113,18 @@ func (service *HeroServiceImpl) CreateHeroes(sessionId string, playerId string, 
 			PlayerId:       playerId,
 			SessionId:      session.Id,
 		})
+		if err != nil {
+			return err
+		}
 	}
 
-	err := service.playerService.SetPlayerHeroes(sessionId, playerId, chosen)
+	err := service.playerService.SetPlayerHeroes(tx, sessionId, playerId, chosen)
 	if err != nil {
 		return err
 	}
 
-	_, err = service.heroRepository.BatchCreateHeroes(params)
+	err = tx.Commit()
 	if err != nil {
-		service.playerService.SetPlayerHeroes(sessionId, playerId, make([]heroes.BaseHeroEnum, 0))
 		return err
 	}
 
@@ -111,18 +137,16 @@ func (service *HeroServiceImpl) InitHeroPosition(
 	heroList2 []*models.Hero,
 	spawnPoints2 []physics.Point,
 ) error {
-	updateParams := make([]repositories.UpdateHeroParams, 0)
+	tx := service.transactionManager.NewReadWriteTransaction()
+	defer tx.Discard()
+
 	for i, spawnPoint := range spawnPoints1 {
 		if i < len(heroList1) {
-			updateParams = append(updateParams, repositories.UpdateHeroParams{
-				Health:         heroList1[i].Health,
-				LastMoveTurn:   heroList1[i].LastMoveTurn,
-				LastAttackTurn: heroList1[i].LastAttackTurn,
-				Position:       spawnPoint,
-				SessionId:      heroList1[i].SessionId,
-				PlayerId:       heroList1[i].PlayerId,
-				BaseHero:       heroList1[i].BaseHero,
-			})
+			heroList1[i].Position = spawnPoint
+			_, err := service.heroRepository.SaveHero(tx, heroList1[i])
+			if err != nil {
+				return err
+			}
 		} else {
 			break
 		}
@@ -130,21 +154,17 @@ func (service *HeroServiceImpl) InitHeroPosition(
 
 	for i, spawnPoint := range spawnPoints2 {
 		if i < len(heroList2) {
-			updateParams = append(updateParams, repositories.UpdateHeroParams{
-				Health:         heroList2[i].Health,
-				LastMoveTurn:   heroList2[i].LastMoveTurn,
-				LastAttackTurn: heroList2[i].LastAttackTurn,
-				Position:       spawnPoint,
-				SessionId:      heroList2[i].SessionId,
-				PlayerId:       heroList2[i].PlayerId,
-				BaseHero:       heroList2[i].BaseHero,
-			})
+			heroList2[i].Position = spawnPoint
+			_, err := service.heroRepository.SaveHero(tx, heroList2[i])
+			if err != nil {
+				return err
+			}
 		} else {
 			break
 		}
 	}
 
-	return service.heroRepository.BatchUpdateHero(updateParams)
+	return tx.Commit()
 }
 
 func (service *HeroServiceImpl) isChosenHeroesValid(available []heroes.BaseHeroEnum, chosen []heroes.BaseHeroEnum) bool {
