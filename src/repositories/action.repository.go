@@ -2,9 +2,8 @@ package repositories
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
-	"strconv"
+	"strings"
 
 	"pixeltactics.com/match/src/core/actions"
 	"pixeltactics.com/match/src/databases"
@@ -14,12 +13,13 @@ import (
 const (
 	BASE_ACTION_LOG_PREFIX = "hero_"
 	ACTION_LIST            = BASE_ACTION_LOG_PREFIX + "list_"
-	ACTION_DETAIL          = BASE_ACTION_LOG_PREFIX + "detail_"
+	// ACTION_LENGTH = BASE_ACTION_LOG_PREFIX + "length_"
+	// ACTION_DETAIL = BASE_ACTION_LOG_PREFIX + "detail_"
 )
 
 type ActionLogRepository interface {
-	GetSessionActionLogs(sessionId string) ([]*models.ActionLog, error)
-	CreateActionLog(obj *models.ActionLog) (*models.ActionLog, error)
+	GetSessionActionLogs(tx databases.BadgerTx, sessionId string) ([]*models.ActionLog, error)
+	CreateActionLog(tx databases.BadgerTx, obj *models.ActionLog) (*models.ActionLog, error)
 }
 
 type ActionLogKey struct {
@@ -56,9 +56,11 @@ func (repo *ActionLogRepositoryImpl) serializeActionLog(action *models.ActionLog
 	}, nil
 }
 
-func (repo *ActionLogRepositoryImpl) GetSessionActionLogs(sessionId string) ([]*models.ActionLog, error) {
+func (repo *ActionLogRepositoryImpl) GetSessionActionLogs(tx databases.BadgerTx, sessionId string) ([]*models.ActionLog, error) {
+	query := databases.GetQuery(tx, repo.badger)
+
 	var serializedLogs []*SerializableActionLog
-	err := repo.badger.Get(ACTION_LIST+sessionId, &serializedLogs)
+	err := query.Get(ACTION_LIST+sessionId, &serializedLogs)
 	if err != nil {
 		return nil, err
 	}
@@ -80,51 +82,44 @@ func (repo *ActionLogRepositoryImpl) GetSessionActionLogs(sessionId string) ([]*
 	return logs, nil
 }
 
-func (repo *ActionLogRepositoryImpl) CreateActionLog(obj *models.ActionLog) (*models.ActionLog, error) {
+func (repo *ActionLogRepositoryImpl) CreateActionLog(tx databases.BadgerTx, obj *models.ActionLog) (*models.ActionLog, error) {
 	serializedObj, err := repo.serializeActionLog(obj)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := repo.badger.NewReadWriteTransaction()
-	defer tx.Discard()
+	// tx := repo.badger.NewReadWriteTransaction()
+	// defer tx.Discard()
 
-	detailKey := ACTION_DETAIL + "_" + serializedObj.SessionId + "_" + serializedObj.PlayerId + "_" + strconv.Itoa(serializedObj.Order)
+	// detailKey := ACTION_DETAIL + "_" + serializedObj.SessionId + "_" + serializedObj.PlayerId + "_" + strconv.Itoa(serializedObj.Order)
 
-	var existsCheck *SerializableActionLog
-	err = tx.Get(detailKey, existsCheck)
-	if err == nil {
-		return nil, errors.New("key is used")
+	var serializedLogs []*SerializableActionLog
+	err = tx.Get(ACTION_LIST+obj.SessionId, &serializedLogs)
+	if err != nil {
+		if !strings.Contains(err.Error(), "not found") {
+			return nil, err
+		} else {
+			serializedLogs = make([]*SerializableActionLog, 0)
+		}
 	}
 
-	err = tx.Set(detailKey, serializedObj)
+	serializedLogs = append(serializedLogs, serializedObj)
+
+	err = tx.Set(ACTION_LIST+obj.SessionId, serializedLogs)
 	if err != nil {
 		return nil, err
 	}
 
-	err = repo.addActionLogIntoList(tx, serializedObj)
-	if err != nil {
-		return nil, err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return nil, err
-	}
+	// err = tx.Commit()
+	// if err != nil {
+	// return nil, err
+	// }
 
 	return obj, nil
 }
 
-func (repo *ActionLogRepositoryImpl) addActionLogIntoList(tx databases.BadgerTx, obj *SerializableActionLog) error {
-	listKey := ACTION_LIST + obj.SessionId
+func (repo *ActionLogRepositoryImpl) UpdateActionLog(obj *models.ActionLog) {
 
-	var logs []*SerializableActionLog
-	err := tx.Get(listKey, &logs)
-	if err != nil {
-		logs = make([]*SerializableActionLog, 0)
-	}
-	logs = append(logs, obj)
-	return tx.Set(listKey, logs)
 }
 
 func NewActionLogRepositoryImpl(

@@ -1,6 +1,7 @@
 package repositories_test
 
 import (
+	"log"
 	"testing"
 
 	"github.com/go-playground/assert/v2"
@@ -17,7 +18,7 @@ func TestGetSessionActionLogsValid(t *testing.T) {
 	db, repo, seededLogs := createActionLogRepository()
 	defer test_utils.CloseTestBadger(db)
 
-	logs, err := repo.GetSessionActionLogs("rendem")
+	logs, err := repo.GetSessionActionLogs(nil, "rendem")
 	assert.Equal(t, err, nil)
 	assert.Equal(t, len(logs), len(seededLogs))
 }
@@ -26,7 +27,7 @@ func TestGetSessionActionLogsInvalid(t *testing.T) {
 	db, repo, _ := createActionLogRepository()
 	defer test_utils.CloseTestBadger(db)
 
-	_, err := repo.GetSessionActionLogs("rendem3")
+	_, err := repo.GetSessionActionLogs(nil, "rendem3")
 	assert.NotEqual(t, err, nil)
 }
 
@@ -34,16 +35,21 @@ func TestCreateActionLog(t *testing.T) {
 	db, repo, _ := createActionLogRepository()
 	defer test_utils.CloseTestBadger(db)
 
+	tx := db.NewReadWriteTransaction()
+	defer tx.Discard()
+
 	expectedLog := &models.ActionLog{
 		SessionId: "testos",
 		PlayerId:  "plr2",
 		Order:     0,
 		Action:    actions.NewAttackAction("plr2", heroes.BaseHeroKnight, heroes.BaseHeroKnight, 100),
 	}
-	_, err := repo.CreateActionLog(expectedLog)
+	_, err := repo.CreateActionLog(tx, expectedLog)
 	assert.Equal(t, err, nil)
 
-	logs, err := repo.GetSessionActionLogs("testos")
+	tx.Commit()
+
+	logs, err := repo.GetSessionActionLogs(nil, "testos")
 	assert.Equal(t, err, nil)
 	assert.Equal(t, len(logs), 1)
 
@@ -55,17 +61,19 @@ func TestCreateActionLog(t *testing.T) {
 func createActionLogRepository() (databases.Badger, repositories.ActionLogRepository, []*models.ActionLog) {
 	db := test_utils.NewTestBadger()
 	repo := repositories.NewActionLogRepositoryImpl(db)
-	seededLogs := seedActionLogs(repo)
+	seededLogs := seedActionLogs(db, repo)
 	return db, repo, seededLogs
 }
 
-func seedActionLogs(repo repositories.ActionLogRepository) []*models.ActionLog {
+func seedActionLogs(db databases.Badger, repo repositories.ActionLogRepository) []*models.ActionLog {
 	actions := []actions.Action{
 		actions.NewAttackAction("plr1", heroes.BaseHeroMage, heroes.BaseHeroMage, 10),
 		actions.NewMoveAction("plr1", heroes.BaseHeroMage, []physics.Direction{physics.DirectionDown, physics.DirectionRight}),
 		actions.NewAttackAction("plr1", heroes.BaseHeroMage, heroes.BaseHeroMage, 10),
 		actions.NewMoveAction("plr1", heroes.BaseHeroMage, []physics.Direction{physics.DirectionUp}),
 	}
+	tx := db.NewReadWriteTransaction()
+	defer tx.Discard()
 	actionLogs := make([]*models.ActionLog, 0)
 	for i, action := range actions {
 		curLog := &models.ActionLog{
@@ -74,11 +82,13 @@ func seedActionLogs(repo repositories.ActionLogRepository) []*models.ActionLog {
 			Order:     i,
 			Action:    action,
 		}
-		_, err := repo.CreateActionLog(curLog)
+		_, err := repo.CreateActionLog(tx, curLog)
 		if err != nil {
+			log.Println(err)
 			panic("invalid seeding")
 		}
 		actionLogs = append(actionLogs, curLog)
 	}
+	tx.Commit()
 	return actionLogs
 }
