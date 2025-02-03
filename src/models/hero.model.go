@@ -15,3 +15,11 @@ type Hero struct {
 	PlayerId  string
 	SessionId string
 }
+
+func (hero *Hero) CanAttackOnTurn(curPlayerId string, currentTurn int) bool {
+	// LastMoveTurn >= LastAttackTurn
+	if curPlayerId != hero.PlayerId {
+		return false
+	}
+	return currentTurn == hero.LastMoveTurn && currentTurn > hero.LastAttackTurn
+}

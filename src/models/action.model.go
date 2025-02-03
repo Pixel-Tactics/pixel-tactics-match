@@ -9,5 +9,6 @@ type ActionLog struct {
 	PlayerId  string
 	Order     int
 
+	Turn   int
 	Action actions.Action
 }

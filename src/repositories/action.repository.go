@@ -30,6 +30,7 @@ type ActionLogKey struct {
 
 type SerializableActionLog struct {
 	ActionLogKey
+	Turn       int
 	Type       actions.ActionType
 	ActionJson string
 }
@@ -49,6 +50,7 @@ func (repo *ActionLogRepositoryImpl) serializeActionLog(action *models.ActionLog
 			PlayerId:  action.PlayerId,
 			Order:     action.Order,
 		},
+		Turn:       action.Turn,
 		Type:       action.Action.GetType(),
 		ActionJson: string(actionJson),
 	}, nil

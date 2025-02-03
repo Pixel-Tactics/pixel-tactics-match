@@ -1,6 +1,8 @@
 package actions
 
-import "pixeltactics.com/match/src/heroes"
+import (
+	"pixeltactics.com/match/src/heroes"
+)
 
 const (
 	ActionTypeAttack ActionType = "ActionTypeAttack"

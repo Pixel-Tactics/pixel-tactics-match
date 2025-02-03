@@ -15,7 +15,9 @@ const (
 )
 
 type HeroService interface {
+	GetStats(heroName heroes.BaseHeroEnum) *heroes.BaseHeroInfo
 	GetPlayerHeroes(sessionId string, playerId string) ([]*models.Hero, error)
+	GetPlayerHero(sessionId string, playerId string, baseHero heroes.BaseHeroEnum) (*models.Hero, error)
 	GetAvailableHeroes() []heroes.BaseHeroEnum
 	CreateHeroes(sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
 	InitHeroPosition(heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
@@ -36,6 +38,25 @@ func (service *HeroServiceImpl) GetPlayerHeroes(sessionId string, playerId strin
 	}
 
 	return service.heroRepository.GetPlayerHeroes(sessionId, playerId, player.HeroBases)
+}
+
+func (service *HeroServiceImpl) GetPlayerHero(sessionId string, playerId string, baseHero heroes.BaseHeroEnum) (*models.Hero, error) {
+	heroes, err := service.GetPlayerHeroes(sessionId, playerId)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, hero := range heroes {
+		if hero.BaseHero == baseHero {
+			return hero, nil
+		}
+	}
+	return nil, errors.New("hero not found")
+}
+
+func (service *HeroServiceImpl) GetStats(heroName heroes.BaseHeroEnum) *heroes.BaseHeroInfo {
+	hero := service.heroFactory.Create(heroName)
+	return hero.GetInfo()
 }
 
 func (service *HeroServiceImpl) GetAvailableHeroes() []heroes.BaseHeroEnum {
