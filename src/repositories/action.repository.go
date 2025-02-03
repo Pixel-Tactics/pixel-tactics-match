@@ -13,13 +13,12 @@ import (
 const (
 	BASE_ACTION_LOG_PREFIX = "hero_"
 	ACTION_LIST            = BASE_ACTION_LOG_PREFIX + "list_"
-	// ACTION_LENGTH = BASE_ACTION_LOG_PREFIX + "length_"
-	// ACTION_DETAIL = BASE_ACTION_LOG_PREFIX + "detail_"
 )
 
 type ActionLogRepository interface {
 	GetSessionActionLogs(tx databases.BadgerTx, sessionId string) ([]*models.ActionLog, error)
 	CreateActionLog(tx databases.BadgerTx, obj *models.ActionLog) (*models.ActionLog, error)
+	UpdateActionLog(tx databases.BadgerTx, obj *models.ActionLog) (*models.ActionLog, error)
 }
 
 type ActionLogKey struct {
@@ -88,11 +87,6 @@ func (repo *ActionLogRepositoryImpl) CreateActionLog(tx databases.BadgerTx, obj 
 		return nil, err
 	}
 
-	// tx := repo.badger.NewReadWriteTransaction()
-	// defer tx.Discard()
-
-	// detailKey := ACTION_DETAIL + "_" + serializedObj.SessionId + "_" + serializedObj.PlayerId + "_" + strconv.Itoa(serializedObj.Order)
-
 	var serializedLogs []*SerializableActionLog
 	err = tx.Get(ACTION_LIST+obj.SessionId, &serializedLogs)
 	if err != nil {
@@ -110,16 +104,29 @@ func (repo *ActionLogRepositoryImpl) CreateActionLog(tx databases.BadgerTx, obj 
 		return nil, err
 	}
 
-	// err = tx.Commit()
-	// if err != nil {
-	// return nil, err
-	// }
-
 	return obj, nil
 }
 
-func (repo *ActionLogRepositoryImpl) UpdateActionLog(obj *models.ActionLog) {
+func (repo *ActionLogRepositoryImpl) UpdateActionLog(tx databases.BadgerTx, obj *models.ActionLog) (*models.ActionLog, error) {
+	serializedObj, err := repo.serializeActionLog(obj)
+	if err != nil {
+		return nil, err
+	}
 
+	var serializedLogs []*SerializableActionLog
+	err = tx.Get(ACTION_LIST+obj.SessionId, &serializedLogs)
+	if err != nil {
+		return nil, err
+	}
+
+	serializedLogs[obj.Order] = serializedObj
+
+	err = tx.Set(ACTION_LIST+obj.SessionId, serializedLogs)
+	if err != nil {
+		return nil, err
+	}
+
+	return obj, nil
 }
 
 func NewActionLogRepositoryImpl(
