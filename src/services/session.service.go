@@ -103,18 +103,28 @@ func (service *SessionServiceImpl) runSession(session *models.Session) {
 	})
 }
 
-func (service *SessionServiceImpl) PreparePlayer(playerId string, chosenHeroes []heroes.BaseHeroEnum) error {
+func (service *SessionServiceImpl) PreparePlayer(playerId string, chosenHeroes []heroes.BaseHeroEnum) (bool, error) {
 	session := service.sessionRepository.GetSessionByPlayerId(playerId)
 	if session == nil || session.State.Type != models.SessionStatePreparation {
-		return exceptions.ActionNotAllowed()
+		return false, exceptions.ActionNotAllowed()
 	}
 
 	if time.Now().After(session.State.Deadline) {
-		return exceptions.ExceededDeadlineError()
+		return false, exceptions.ExceededDeadlineError()
 	}
 
-	service.heroService.CreateHeroes(session.Id, playerId, chosenHeroes)
-	return nil
+	err := service.heroService.CreateHeroes(session.Id, playerId, chosenHeroes)
+	if err != nil {
+		return false, err
+	}
+
+	err = service.StartBattle(session)
+	if err != nil && err.Error() == exceptions.HeroPickupError().Error() {
+		return false, nil // other player not yet pickup
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (service *SessionServiceImpl) StartBattle(session *models.Session) error {
@@ -160,12 +170,19 @@ func (service *SessionServiceImpl) StartBattle(session *models.Session) error {
 	}
 
 	sessionState := service.stateFactory.Create(session)
-	sessionState.Start(time.Now().Add(PlayerTurnTime))
-	service.sessionRepository.UpdateSession(repositories.UpdateSessionParams{
+	err = sessionState.Start(time.Now().Add(PlayerTurnTime))
+	if err != nil {
+		return err
+	}
+
+	_, err = service.sessionRepository.UpdateSession(repositories.UpdateSessionParams{
 		SessionId: session.Id,
 		State:     session.State,
 		WinnerId:  session.WinnerId,
 	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

@@ -16,17 +16,15 @@ type ActionService interface {
 }
 
 type ActionServiceImpl struct {
-	mapService  MapService
-	heroService HeroService
-	// playerService  PlayerService
+	mapService     MapService
+	heroService    HeroService
 	sessionService SessionService
 
-	// stateFactory       states.SessionStateFactory
 	actionRepository   repositories.ActionLogRepository
 	transactionManager databases.TransactionManager
 }
 
-func (service *ActionServiceImpl) Move(actionLog *models.ActionLog, matchMap *models.Map) error {
+func (service *ActionServiceImpl) Move(actionLog *models.ActionLog) error {
 	session := service.sessionService.GetSessionById(actionLog.SessionId)
 	if session == nil {
 		return errors.New("invalid session id")
@@ -81,7 +79,7 @@ func (service *ActionServiceImpl) Move(actionLog *models.ActionLog, matchMap *mo
 	return nil
 }
 
-func (service *ActionServiceImpl) Attack(actionLog *models.ActionLog, matchMap *models.Map) error {
+func (service *ActionServiceImpl) Attack(actionLog *models.ActionLog) error {
 	session := service.sessionService.GetSessionById(actionLog.SessionId)
 	if session == nil {
 		return errors.New("invalid session id")
