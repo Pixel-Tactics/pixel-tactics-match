@@ -20,6 +20,7 @@ type HeroService interface {
 	GetPlayerHeroes(sessionId string, playerId string) ([]*models.Hero, error)
 	GetPlayerHero(sessionId string, playerId string, baseHero heroes.BaseHeroEnum) (*models.Hero, error)
 	GetAvailableHeroes() []heroes.BaseHeroEnum
+	CreateHeroesTx(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
 	CreateHeroes(sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
 	InitHeroPosition(heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
 
@@ -93,7 +94,7 @@ func (service *HeroServiceImpl) GetAvailableHeroes() []heroes.BaseHeroEnum {
 	}
 }
 
-func (service *HeroServiceImpl) CreateHeroes(sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error {
+func (service *HeroServiceImpl) CreateHeroesTx(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error {
 	session := service.sessionService.GetSessionById(sessionId)
 	if session == nil {
 		return exceptions.SessionNotFound()
@@ -103,9 +104,6 @@ func (service *HeroServiceImpl) CreateHeroes(sessionId string, playerId string, 
 	if !isValid {
 		return exceptions.HeroPickupError()
 	}
-
-	tx := service.transactionManager.NewReadWriteTransaction()
-	defer tx.Discard()
 
 	for _, heroEnum := range chosen {
 		baseHero := service.heroFactory.Create(heroEnum)
@@ -128,6 +126,18 @@ func (service *HeroServiceImpl) CreateHeroes(sessionId string, playerId string, 
 		return err
 	}
 
+	return nil
+}
+
+func (service *HeroServiceImpl) CreateHeroes(sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error {
+	tx := service.transactionManager.NewReadWriteTransaction()
+	defer tx.Discard()
+
+	err := service.CreateHeroesTx(tx, sessionId, playerId, chosen)
+	if err != nil {
+		return err
+	}
+
 	err = tx.Commit()
 	if err != nil {
 		return err
@@ -136,14 +146,13 @@ func (service *HeroServiceImpl) CreateHeroes(sessionId string, playerId string, 
 	return nil
 }
 
-func (service *HeroServiceImpl) InitHeroPosition(
+func (service *HeroServiceImpl) InitHeroPositionTx(
+	tx databases.BadgerTx,
 	heroList1 []*models.Hero,
 	spawnPoints1 []physics.Point,
 	heroList2 []*models.Hero,
 	spawnPoints2 []physics.Point,
 ) error {
-	tx := service.transactionManager.NewReadWriteTransaction()
-	defer tx.Discard()
 
 	for i, spawnPoint := range spawnPoints1 {
 		if i < len(heroList1) {
@@ -170,6 +179,28 @@ func (service *HeroServiceImpl) InitHeroPosition(
 	}
 
 	return tx.Commit()
+}
+
+func (service *HeroServiceImpl) InitHeroPosition(
+	heroList1 []*models.Hero,
+	spawnPoints1 []physics.Point,
+	heroList2 []*models.Hero,
+	spawnPoints2 []physics.Point,
+) error {
+	tx := service.transactionManager.NewReadWriteTransaction()
+	defer tx.Discard()
+
+	err := service.InitHeroPositionTx(tx, heroList1, spawnPoints1, heroList2, spawnPoints2)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (service *HeroServiceImpl) isChosenHeroesValid(available []heroes.BaseHeroEnum, chosen []heroes.BaseHeroEnum) bool {
