@@ -24,6 +24,7 @@ type HeroService interface {
 	InitHeroPosition(heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
 
 	ApplyDamage(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, trgHero *models.Hero, damage int) error
+	MoveHero(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, position physics.Point) error
 }
 
 type HeroServiceImpl struct {
@@ -57,12 +58,21 @@ func (service *HeroServiceImpl) GetStats(heroName heroes.BaseHeroEnum) *heroes.B
 	return hero.GetInfo()
 }
 
+func (service *HeroServiceImpl) MoveHero(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, position physics.Point) error {
+	srcHero.Position = position
+	srcHero.LastMoveTurn = currentTurn
+
+	_, err := service.heroRepository.SaveHero(tx, srcHero)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (service *HeroServiceImpl) ApplyDamage(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, trgHero *models.Hero, damage int) error {
 	srcHero.LastAttackTurn = currentTurn
 	trgHero.Health = max(trgHero.Health-damage, 0)
-
-	// tx := service.transactionManager.NewReadWriteTransaction()
-	// defer tx.Discard()
 
 	_, err := service.heroRepository.SaveHero(tx, srcHero)
 	if err != nil {
@@ -72,11 +82,6 @@ func (service *HeroServiceImpl) ApplyDamage(tx databases.BadgerTx, currentTurn i
 	if err != nil {
 		return err
 	}
-
-	// err = tx.Commit()
-	// if err != nil {
-	// 	return err
-	// }
 
 	return nil
 }

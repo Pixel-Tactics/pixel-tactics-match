@@ -4,11 +4,11 @@ import (
 	"errors"
 
 	"pixeltactics.com/match/src/core/actions"
-	"pixeltactics.com/match/src/core/states"
 	"pixeltactics.com/match/src/databases"
 	"pixeltactics.com/match/src/models"
 	"pixeltactics.com/match/src/repositories"
 	"pixeltactics.com/match/src/utils/algorithms"
+	"pixeltactics.com/match/src/utils/physics"
 )
 
 type ActionService interface {
@@ -16,19 +16,70 @@ type ActionService interface {
 }
 
 type ActionServiceImpl struct {
-	mapService     MapService
-	heroService    HeroService
-	playerService  PlayerService
+	mapService  MapService
+	heroService HeroService
+	// playerService  PlayerService
 	sessionService SessionService
 
-	stateFactory       states.SessionStateFactory
+	// stateFactory       states.SessionStateFactory
 	actionRepository   repositories.ActionLogRepository
 	transactionManager databases.TransactionManager
 }
 
-// func (service *ActionServiceImpl) Move(actionLog *models.ActionLog, matchMap *models.Map) error {
+func (service *ActionServiceImpl) Move(actionLog *models.ActionLog, matchMap *models.Map) error {
+	session := service.sessionService.GetSessionById(actionLog.SessionId)
+	if session == nil {
+		return errors.New("invalid session id")
+	}
 
-// }
+	activePlayerId, err := session.GetActivePlayer()
+	if err != nil {
+		return err
+	}
+
+	action, ok := actionLog.Action.(*actions.MoveAction)
+	if !ok {
+		return errors.New("invalid action")
+	}
+
+	srcHero, err := service.heroService.GetPlayerHero(actionLog.SessionId, actionLog.PlayerId, action.SourceHero)
+	if err != nil {
+		return err
+	}
+
+	if !srcHero.CanMoveOnTurn(activePlayerId, actionLog.Turn) {
+		return errors.New("hero cannot move")
+	}
+
+	srcHeroStats := service.heroService.GetStats(srcHero.BaseHero)
+	if len(action.DirectionList) > srcHeroStats.BaseStats.MoveRange {
+		return errors.New("invalid movement range")
+	}
+
+	curPos := srcHero.Position
+	for _, dir := range action.DirectionList {
+		dirPoint := physics.GetPointFromDirection(dir)
+		curPos = curPos.Add(dirPoint)
+		isPointOpen, err := service.mapService.IsPointOpen(session.Id, curPos)
+		if err != nil {
+			return err
+		}
+		if !isPointOpen {
+			return errors.New("point is occupied")
+		}
+	}
+
+	tx := service.transactionManager.NewReadWriteTransaction()
+	defer tx.Discard()
+
+	service.heroService.MoveHero(tx, actionLog.Order, srcHero, curPos)
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func (service *ActionServiceImpl) Attack(actionLog *models.ActionLog, matchMap *models.Map) error {
 	session := service.sessionService.GetSessionById(actionLog.SessionId)
