@@ -61,6 +61,10 @@ func (repo *PlayerRepositoryImpl) CreatePlayer(tx databases.BadgerTx, params Cre
 }
 
 func (repo *PlayerRepositoryImpl) UpdatePlayer(tx databases.BadgerTx, params UpdatePlayerParams) (*models.Player, error) {
+	if tx == nil {
+		return nil, errors.New("transaction object is null")
+	}
+
 	player := repo.GetPlayerByIdAndSessionId(tx, params.PlayerId, params.SessionId)
 	if player == nil {
 		return nil, errors.New("invalid player key")
@@ -76,6 +80,10 @@ func (repo *PlayerRepositoryImpl) UpdatePlayer(tx databases.BadgerTx, params Upd
 }
 
 func (repo *PlayerRepositoryImpl) DeletePlayer(tx databases.BadgerTx, playerId string, sessionId string) error {
+	if tx == nil {
+		return errors.New("transaction object is null")
+	}
+
 	var player models.Player
 	err := tx.Get(PLAYERID_SESSIONID_TO_PLAYER+sessionId+"_"+playerId, &player)
 	if err != nil {

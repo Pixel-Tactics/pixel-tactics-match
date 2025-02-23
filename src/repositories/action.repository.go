@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"strings"
 
@@ -82,6 +83,10 @@ func (repo *ActionLogRepositoryImpl) GetSessionActionLogs(tx databases.BadgerTx,
 }
 
 func (repo *ActionLogRepositoryImpl) CreateActionLog(tx databases.BadgerTx, obj *models.ActionLog) (*models.ActionLog, error) {
+	if tx == nil {
+		return nil, errors.New("transaction object is null")
+	}
+
 	serializedObj, err := repo.serializeActionLog(obj)
 	if err != nil {
 		return nil, err
@@ -108,6 +113,10 @@ func (repo *ActionLogRepositoryImpl) CreateActionLog(tx databases.BadgerTx, obj 
 }
 
 func (repo *ActionLogRepositoryImpl) UpdateActionLog(tx databases.BadgerTx, obj *models.ActionLog) (*models.ActionLog, error) {
+	if tx == nil {
+		return nil, errors.New("transaction object is null")
+	}
+
 	serializedObj, err := repo.serializeActionLog(obj)
 	if err != nil {
 		return nil, err

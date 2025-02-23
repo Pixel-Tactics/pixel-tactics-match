@@ -17,12 +17,13 @@ const (
 
 type HeroService interface {
 	GetStats(heroName heroes.BaseHeroEnum) *heroes.BaseHeroInfo
-	GetPlayerHeroes(sessionId string, playerId string) ([]*models.Hero, error)
+	GetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string) ([]*models.Hero, error)
 	GetPlayerHero(sessionId string, playerId string, baseHero heroes.BaseHeroEnum) (*models.Hero, error)
 	GetAvailableHeroes() []heroes.BaseHeroEnum
 	CreateHeroesTx(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
 	CreateHeroes(sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
 	InitHeroPosition(heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
+	InitHeroPositionTx(tx databases.BadgerTx, heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
 
 	ApplyDamage(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, trgHero *models.Hero, damage int) error
 	MoveHero(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, position physics.Point) error
@@ -37,8 +38,8 @@ type HeroServiceImpl struct {
 	transactionManager databases.TransactionManager
 }
 
-func (service *HeroServiceImpl) GetPlayerHeroes(sessionId string, playerId string) ([]*models.Hero, error) {
-	player := service.playerService.GetPlayer(sessionId, playerId)
+func (service *HeroServiceImpl) GetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string) ([]*models.Hero, error) {
+	player := service.playerService.GetPlayer(tx, sessionId, playerId)
 	if player == nil {
 		return nil, errors.New("invalid player")
 	}
@@ -95,7 +96,7 @@ func (service *HeroServiceImpl) GetAvailableHeroes() []heroes.BaseHeroEnum {
 }
 
 func (service *HeroServiceImpl) CreateHeroesTx(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error {
-	session := service.sessionService.GetSessionById(sessionId)
+	session := service.sessionService.GetSessionById(tx, sessionId)
 	if session == nil {
 		return exceptions.SessionNotFound()
 	}

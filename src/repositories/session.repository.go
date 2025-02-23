@@ -15,11 +15,11 @@ const (
 )
 
 type SessionRepositoryV2 interface {
-	GetSessionById(sessionId string) *models.Session
-	GetSessionByPlayerId(playerId string) *models.Session
-	CreateSession(params CreateSessionParams) (*models.Session, error)
-	UpdateSession(params UpdateSessionParams) (*models.Session, error)
-	DeleteSession(sessionId string) error
+	GetSessionById(tx databases.BadgerTx, sessionId string) *models.Session
+	GetSessionByPlayerId(tx databases.BadgerTx, playerId string) *models.Session
+	CreateSession(tx databases.BadgerTx, params CreateSessionParams) (*models.Session, error)
+	UpdateSession(tx databases.BadgerTx, params UpdateSessionParams) (*models.Session, error)
+	DeleteSession(tx databases.BadgerTx, sessionId string) error
 }
 
 type CreateSessionParams struct {
@@ -39,30 +39,38 @@ type SessionRepositoryV2Impl struct {
 	badger databases.Badger
 }
 
-func (repo *SessionRepositoryV2Impl) GetSessionById(sessionId string) *models.Session {
+func (repo *SessionRepositoryV2Impl) GetSessionById(tx databases.BadgerTx, sessionId string) *models.Session {
+	query := databases.GetQuery(tx, repo.badger)
+
 	var session models.Session
-	err := repo.badger.Get(SESSION_ID_TO_SESSION+sessionId, &session)
+	err := query.Get(SESSION_ID_TO_SESSION+sessionId, &session)
 	if err != nil {
 		return nil
 	}
 	return &session
 }
 
-func (repo *SessionRepositoryV2Impl) GetSessionByPlayerId(playerId string) *models.Session {
+func (repo *SessionRepositoryV2Impl) GetSessionByPlayerId(tx databases.BadgerTx, playerId string) *models.Session {
+	query := databases.GetQuery(tx, repo.badger)
+
 	var sessionId string
-	err := repo.badger.Get(PLAYERID_TO_SESSION+playerId, &sessionId)
+	err := query.Get(PLAYERID_TO_SESSION+playerId, &sessionId)
 	if err != nil {
 		return nil
 	}
 	var session models.Session
-	err = repo.badger.Get(SESSION_ID_TO_SESSION+sessionId, &session)
+	err = query.Get(SESSION_ID_TO_SESSION+sessionId, &session)
 	if err != nil {
 		return nil
 	}
 	return &session
 }
 
-func (repo *SessionRepositoryV2Impl) CreateSession(params CreateSessionParams) (*models.Session, error) {
+func (repo *SessionRepositoryV2Impl) CreateSession(tx databases.BadgerTx, params CreateSessionParams) (*models.Session, error) {
+	if tx == nil {
+		return nil, errors.New("transaction object is null")
+	}
+
 	sessionId := uuid.New().String()
 	session := &models.Session{
 		Id: sessionId,
@@ -76,28 +84,27 @@ func (repo *SessionRepositoryV2Impl) CreateSession(params CreateSessionParams) (
 			params.PlayerId2,
 		},
 	}
-	err := repo.badger.BatchSet([]*databases.BadgerSetParams{
-		{
-			Key:   SESSION_ID_TO_SESSION + sessionId,
-			Value: session,
-		},
-		{
-			Key:   PLAYERID_TO_SESSION + session.PlayerIds[0],
-			Value: sessionId,
-		},
-		{
-			Key:   PLAYERID_TO_SESSION + session.PlayerIds[1],
-			Value: sessionId,
-		},
-	})
+	err := tx.Set(SESSION_ID_TO_SESSION+sessionId, session)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Set(PLAYERID_TO_SESSION+session.PlayerIds[0], sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Set(PLAYERID_TO_SESSION+session.PlayerIds[1], sessionId)
 	if err != nil {
 		return nil, err
 	}
 	return session, nil
 }
 
-func (repo *SessionRepositoryV2Impl) UpdateSession(params UpdateSessionParams) (*models.Session, error) {
-	session := repo.GetSessionById(params.SessionId)
+func (repo *SessionRepositoryV2Impl) UpdateSession(tx databases.BadgerTx, params UpdateSessionParams) (*models.Session, error) {
+	query := databases.GetQuery(tx, repo.badger)
+
+	session := repo.GetSessionById(nil, params.SessionId)
 	if session == nil {
 		return nil, errors.New("invalid session id")
 	}
@@ -105,30 +112,35 @@ func (repo *SessionRepositoryV2Impl) UpdateSession(params UpdateSessionParams) (
 	session.State = params.State
 	session.WinnerId = params.WinnerId
 
-	err := repo.badger.Set(SESSION_ID_TO_SESSION+params.SessionId, session)
+	err := query.Set(SESSION_ID_TO_SESSION+params.SessionId, session)
 	if err != nil {
 		return nil, err
 	}
 	return session, nil
 }
 
-func (repo *SessionRepositoryV2Impl) DeleteSession(sessionId string) error {
+func (repo *SessionRepositoryV2Impl) DeleteSession(tx databases.BadgerTx, sessionId string) error {
+	if tx == nil {
+		return errors.New("transaction object is null")
+	}
+
 	var session models.Session
-	err := repo.badger.Get(SESSION_ID_TO_SESSION+sessionId, &session)
+	err := tx.Get(SESSION_ID_TO_SESSION+sessionId, &session)
 	if err != nil {
 		return err
 	}
-	return repo.badger.BatchDelete([]*databases.BadgerDeleteParams{
-		{
-			Key: SESSION_ID_TO_SESSION + sessionId,
-		},
-		{
-			Key: PLAYERID_TO_SESSION + session.PlayerIds[0],
-		},
-		{
-			Key: PLAYERID_TO_SESSION + session.PlayerIds[1],
-		},
-	})
+
+	err = tx.Delete(SESSION_ID_TO_SESSION + sessionId)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Delete(PLAYERID_TO_SESSION + session.PlayerIds[0])
+	if err != nil {
+		return err
+	}
+
+	return tx.Delete(PLAYERID_TO_SESSION + session.PlayerIds[1])
 }
 
 func NewSessionRepositoryV2Impl(

@@ -59,7 +59,9 @@ func (repo *HeroRepositoryImpl) GetHeroBySessionId(tx databases.BadgerTx, params
 }
 
 func (repo *HeroRepositoryImpl) SaveHero(tx databases.BadgerTx, obj *models.Hero) (*models.Hero, error) {
-	err := tx.Set(BASE_HERO_PREFIX+obj.SessionId+"_"+obj.PlayerId+"_"+obj.BaseHero, obj)
+	query := databases.GetQuery(tx, repo.badger)
+
+	err := query.Set(BASE_HERO_PREFIX+obj.SessionId+"_"+obj.PlayerId+"_"+obj.BaseHero, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +144,10 @@ func (repo *HeroRepositoryImpl) SaveHero(tx databases.BadgerTx, obj *models.Hero
 // }
 
 func (repo *HeroRepositoryImpl) DeleteHero(tx databases.BadgerTx, params HeroKey) error {
+	if tx == nil {
+		return errors.New("transaction object is null")
+	}
+
 	var hero models.Hero
 	err := tx.Get(BASE_HERO_PREFIX+params.SessionId+"_"+params.PlayerId+"_"+params.BaseHero, &hero)
 	if err != nil {

@@ -11,30 +11,26 @@ import (
 )
 
 type PlayerService interface {
-	GetPlayer(playerId string, sessionId string) *models.Player
-	CreatePlayerForSession(sessionId string, playerId1 string, playerId2 string) error
+	GetPlayer(tx databases.BadgerTx, playerId string, sessionId string) *models.Player
+	CreatePlayerForSession(tx databases.BadgerTx, sessionId string, playerId1 string, playerId2 string) error
 	SetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string, heroList []heroes.BaseHeroEnum) error
 }
 
 type PlayerServiceImpl struct {
 	playerRepository repositories.PlayerRepository
 
-	sessionService     SessionService
-	transactionManager databases.TransactionManager
+	sessionService SessionService
 }
 
-func (service *PlayerServiceImpl) GetPlayer(playerId string, sessionId string) *models.Player {
-	return service.playerRepository.GetPlayerByIdAndSessionId(nil, playerId, sessionId)
+func (service *PlayerServiceImpl) GetPlayer(tx databases.BadgerTx, playerId string, sessionId string) *models.Player {
+	return service.playerRepository.GetPlayerByIdAndSessionId(tx, playerId, sessionId)
 }
 
-func (service *PlayerServiceImpl) CreatePlayerForSession(sessionId string, playerId1 string, playerId2 string) error {
-	session := service.sessionService.GetSessionById(sessionId)
+func (service *PlayerServiceImpl) CreatePlayerForSession(tx databases.BadgerTx, sessionId string, playerId1 string, playerId2 string) error {
+	session := service.sessionService.GetSessionById(tx, sessionId)
 	if session == nil {
 		return exceptions.SessionNotFound()
 	}
-
-	tx := service.transactionManager.NewReadWriteTransaction()
-	defer tx.Discard()
 
 	// TODO: check if player really exists as multilayer protection
 
@@ -55,16 +51,11 @@ func (service *PlayerServiceImpl) CreatePlayerForSession(sessionId string, playe
 		return err
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
 func (service *PlayerServiceImpl) SetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string, heroList []heroes.BaseHeroEnum) error {
-	player := service.GetPlayer(playerId, sessionId)
+	player := service.GetPlayer(tx, playerId, sessionId)
 	if player == nil {
 		return errors.New("invalid player key")
 	}
