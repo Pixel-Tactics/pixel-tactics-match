@@ -5,10 +5,13 @@ import (
 
 	"pixeltactics.com/match/src/config"
 	"pixeltactics.com/match/src/databases"
+	"pixeltactics.com/match/src/gateway"
+	"pixeltactics.com/match/src/services"
 	"pixeltactics.com/match/src/utils/cloud"
-	ws "pixeltactics.com/match/src/websocket/core"
+	"pixeltactics.com/match/src/websockets"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 )
 
@@ -19,7 +22,11 @@ func main() {
 	badger := databases.NewBadgerImpl()
 	defer badger.Close()
 
-	clientHub := ws.NewClientHub()
+	validator := validator.New()
+	authService := services.NewAuthService()
+	authGateway := gateway.NewAuthGateway(authService, validator)
+	gatewayRouter := gateway.NewRouter(authGateway)
+	clientHub := websockets.NewClientHub(gatewayRouter)
 	go clientHub.Run()
 
 	router := gin.Default()
@@ -38,12 +45,12 @@ func main() {
 
 	router.GET("/players", func(context *gin.Context) {
 		context.JSON(http.StatusOK, map[string]interface{}{
-			"players": clientHub.GetAllPlayerId(),
+			"players": clientHub.GetAllUserId(),
 		})
 	})
 
 	router.GET("/ws", func(context *gin.Context) {
-		ws.ServeWebSocket(clientHub, context.Writer, context.Request)
+		websockets.ServeWebSocket(clientHub, context.Writer, context.Request)
 	})
 
 	router.Run("0.0.0.0:8000")

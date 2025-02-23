@@ -1,4 +1,4 @@
-package gateway
+package messages
 
 import (
 	"encoding/json"
@@ -7,9 +7,15 @@ import (
 	"pixeltactics.com/match/src/exceptions"
 )
 
-type Client struct {
+type Messager interface {
+	Send(clientId string, message *Message)
+	SendBack(message *Message)
+	SetClientId(clientId string)
+}
+
+type WebSocketMessager struct {
 	Message     *Message
-	ClientId    string
+	ClientId    *string
 	Send        func(clientId string, message *Message)
 	SendBack    func(message *Message)
 	SetClientId func(clientId string)

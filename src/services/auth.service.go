@@ -48,3 +48,7 @@ func (service *AuthServiceImpl) GetUsernameFromToken(playerToken string) (string
 
 	return playerId, nil
 }
+
+func NewAuthService() AuthService {
+	return &AuthServiceImpl{}
+}

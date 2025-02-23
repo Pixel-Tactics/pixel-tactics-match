@@ -3,13 +3,15 @@ package gateway
 import (
 	"errors"
 
+	"github.com/go-playground/validator/v10"
 	"pixeltactics.com/match/src/dto"
+	"pixeltactics.com/match/src/messages"
 	"pixeltactics.com/match/src/services"
 	convert_utils "pixeltactics.com/match/src/utils/convert"
 )
 
 type AuthGateway interface {
-	AuthenticateClient(client *Client)
+	AuthenticateClient(client *messages.WebSocketMessager)
 }
 
 type AuthGatewayImpl struct {
@@ -17,7 +19,7 @@ type AuthGatewayImpl struct {
 	BaseGateway
 }
 
-func (gateway *AuthGatewayImpl) AuthenticateClient(client *Client) {
+func (gateway *AuthGatewayImpl) AuthenticateClient(client *messages.WebSocketMessager) {
 	var body dto.Auth
 	err := convert_utils.MapToObject(client.Message.Body, &body)
 	if err != nil {
@@ -27,45 +29,34 @@ func (gateway *AuthGatewayImpl) AuthenticateClient(client *Client) {
 
 	err = gateway.Validator.Struct(body)
 	if err != nil {
-		client.SendBack(Error(errors.New("invalid player token")))
+		client.SendBack(Error(errors.New("invalid input")))
 		return
 	}
 
 	username, err := gateway.AuthService.GetUsernameFromToken(body.PlayerToken)
 	if err != nil {
-		client.SendBack(Error(errors.New("invalid player token")))
+		client.SendBack(Error(err))
 	} else {
 		client.SetClientId(username)
-		client.SendBack(&Message{
+		client.SendBack(&messages.Message{
 			Type:       client.Message.Type,
 			Identifier: client.Message.Identifier,
 			Body: map[string]interface{}{
 				"status":  "success",
-				"message": "user registered on session",
+				"message": "user registered on session as " + username,
 			},
 		})
 	}
 }
 
-// func NewAuthGateway() *AuthGateway {
-// 	return &AuthGateway{
-// 		Interaction:      make(chan *ws_types.Interaction, 256),
-// 		successResponses: make(chan *ws_types.Interaction, 256),
-// 		errorResponses:   make(chan *ws_types.Interaction, 256),
-// 	}
-// }
-
-// func (gateway *AuthHandler) Run() {
-// 	for {
-// 		select {
-// 		case interaction := <-handler.Interaction:
-// 			if interaction.Request.Message.Action == ws_types.ACTION_AUTH {
-// 				handler.AuthenticateClient(interaction.Request, interaction.Response)
-// 			}
-// 		case successResp := <-handler.successResponses:
-// 			handler.handleSuccess(successResp.Request, successResp.Response)
-// 		case errorResp := <-handler.errorResponses:
-// 			handler.handleError(errorResp.Request, errorResp.Response)
-// 		}
-// 	}
-// }
+func NewAuthGateway(
+	authService services.AuthService,
+	validator *validator.Validate,
+) AuthGateway {
+	return &AuthGatewayImpl{
+		AuthService: authService,
+		BaseGateway: BaseGateway{
+			Validator: validator,
+		},
+	}
+}
