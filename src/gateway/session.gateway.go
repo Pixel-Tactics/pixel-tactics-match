@@ -15,6 +15,7 @@ type SessionGateway interface {
 	GetIsPlayerInSession(client *messages.WebSocketMessager)
 	GetSession(client *messages.WebSocketMessager)
 	CreateSession(client *messages.WebSocketMessager)
+	PreparePlayer(client *messages.WebSocketMessager)
 }
 
 type SessionGatewayImpl struct {
@@ -144,27 +145,34 @@ func (gateway *SessionGatewayImpl) CreateSession(client *messages.WebSocketMessa
 	}
 }
 
-// func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessager) {
-// 	var body dto.PreparePlayerRequestDTO
-// 	err := convert_utils.MapToObject(req.Message.Body, &body)
-// 	if err != nil {
-// 		res.SendToClient(responses.ErrorMessage(err))
-// 		return
-// 	}
+func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessager) {
+	var body dto.PreparePlayerRequest
+	err := convert_utils.MapToObject(client.Message.Body, &body)
+	if err != nil {
+		client.SendBack(Error(err))
+		return
+	}
 
-// 	_, err = handler.matchService.PreparePlayer(body)
-// 	if err != nil {
-// 		res.SendToClient(responses.ErrorMessage(err))
-// 		return
-// 	}
+	err = gateway.Validator.Struct(body)
+	if err != nil {
+		log.Println(err)
+		client.SendBack(Error(errors.New("invalid input")))
+		return
+	}
 
-// 	res.SendToClient(&ws_types.Message{
-// 		Action: ws_types.ACTION_FEEDBACK,
-// 		Body: map[string]interface{}{
-// 			"success": true,
-// 		},
-// 	})
-// }
+	_, err = gateway.SessionService.PreparePlayer(body.PlayerId, body.ChosenHeroList)
+	if err != nil {
+		client.SendBack(Error(err))
+		return
+	}
+
+	client.SendBack(&messages.Message{
+		Type: client.Message.Type,
+		Body: map[string]interface{}{
+			"success": true,
+		},
+	})
+}
 
 // func (gateway *SessionGatewayImpl) ExecuteAction(client *messages.WebSocketMessager) {
 // 	var body dto.ExecuteActionRequestDTO

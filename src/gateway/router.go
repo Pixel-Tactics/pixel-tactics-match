@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"errors"
-	"log"
 
 	"pixeltactics.com/match/src/messages"
 )
@@ -35,12 +34,12 @@ type RouterImpl struct {
 }
 
 func (router *RouterImpl) RouteMessage(client *messages.WebSocketMessager) {
-	log.Println("TOOO SHINJINTERU")
 	if client.Message.Type == TYPE_AUTH {
 		router.AuthGateway.AuthenticateClient(client)
 	} else if client.Message.Type == TYPE_CREATE_SESSION {
-		log.Println("HERE")
 		router.SessionGateway.CreateSession(client)
+	} else if client.Message.Type == TYPE_PREPARE_PLAYER {
+		router.SessionGateway.PreparePlayer(client)
 	} else {
 		client.SendBack(Error(errors.New("invalid type")))
 	}

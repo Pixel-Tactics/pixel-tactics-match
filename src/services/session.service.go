@@ -24,6 +24,7 @@ type SessionService interface {
 	GetSessionById(tx databases.BadgerTx, sessionId string) *models.Session
 	GetSessionByPlayerId(playerId string) *models.Session
 	CreateSession(playerId string, opponentId string) (*models.Session, error)
+	PreparePlayer(playerId string, chosenHeroes []heroes.BaseHeroEnum) (bool, error)
 	CompileSession(sessionId string) (map[string]interface{}, error)
 }
 
