@@ -66,12 +66,20 @@ func (service *SessionServiceImpl) CreateSession(playerId string, opponentId str
 
 	// Session object is already created (by opponent)
 	if isStart {
+		log.Println("STARTING...")
 		oppSession := service.SessionRepository.GetSessionByPlayerId(tx, opponentId)
 		if oppSession == nil {
 			log.Fatalln("session found before but now not")
 			return nil, errors.New("server cannot get opponent session")
 		}
-		service.runSession(tx, oppSession)
+		err = service.runSession(tx, oppSession)
+		if err != nil {
+			return nil, err
+		}
+		err = tx.Commit()
+		if err != nil {
+			return nil, err
+		}
 		return oppSession, nil
 	}
 
@@ -106,20 +114,26 @@ func (service *SessionServiceImpl) CreateSession(playerId string, opponentId str
 	return session, nil
 }
 
-func (service *SessionServiceImpl) runSession(tx databases.BadgerTx, session *models.Session) {
+func (service *SessionServiceImpl) runSession(tx databases.BadgerTx, session *models.Session) error {
 	preparationDeadline := time.Now().Add(PreparationTime)
 	sessionState := service.StateFactory.Create(session)
 	err := sessionState.Start(preparationDeadline)
 	if err != nil {
 		panic("PANIC: invalid session state")
 	}
-	service.SessionRepository.UpdateSession(tx, repositories.UpdateSessionParams{
+	newSession, err := service.SessionRepository.UpdateSession(tx, repositories.UpdateSessionParams{
 		SessionId: session.Id,
 		State:     session.State,
 	})
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	log.Println(newSession)
 	time.AfterFunc(time.Until(preparationDeadline), func() {
 		service.checkForExpire(tx, session, session.State.Id)
 	})
+	return nil
 }
 
 func (service *SessionServiceImpl) PreparePlayer(playerId string, chosenHeroes []heroes.BaseHeroEnum) (bool, error) {
@@ -244,6 +258,7 @@ func (service *SessionServiceImpl) checkPlayerSession(tx databases.BadgerTx, pla
 
 func (service *SessionServiceImpl) checkOpponentSession(tx databases.BadgerTx, playerId string, opponentId string) (bool, error) {
 	oppSession := service.SessionRepository.GetSessionByPlayerId(tx, opponentId)
+	log.Println(oppSession)
 	if oppSession != nil {
 		if oppSession.IsRunning() {
 			return false, errors.New("opponent is in running session")

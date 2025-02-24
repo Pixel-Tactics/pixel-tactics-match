@@ -1,6 +1,7 @@
 package states
 
 import (
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ type MatchmakingState struct {
 }
 
 func (state *MatchmakingState) Start(deadline time.Time) error {
+	log.Println("SETTING TO PREPARATION")
 	state.session.State = models.State{
 		Id:       uuid.New().String(),
 		Type:     models.SessionStatePreparation,
