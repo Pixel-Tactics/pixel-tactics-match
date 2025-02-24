@@ -21,3 +21,7 @@ func (factory *SessionStateFactoryImpl) Create(session *models.Session) SessionS
 		return NewMatchmakingState(session)
 	}
 }
+
+func NewSessionStateFactory() SessionStateFactory {
+	return &SessionStateFactoryImpl{}
+}

@@ -92,9 +92,9 @@ func (repo *PlayerRepositoryImpl) DeletePlayer(tx databases.BadgerTx, playerId s
 	return tx.Delete(PLAYERID_SESSIONID_TO_PLAYER + sessionId + "_" + playerId)
 }
 
-func NewPlayerRepositoryImpl(
+func NewPlayerRepository(
 	badger databases.Badger,
-) *PlayerRepositoryImpl {
+) PlayerRepository {
 	return &PlayerRepositoryImpl{
 		badger: badger,
 	}

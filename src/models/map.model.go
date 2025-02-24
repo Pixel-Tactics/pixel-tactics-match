@@ -1,6 +1,6 @@
 package models
 
 type Map struct {
-	SessionId string
+	SessionId string  `json:"sessionId"`
 	Structure [][]int `json:"structure"`
 }

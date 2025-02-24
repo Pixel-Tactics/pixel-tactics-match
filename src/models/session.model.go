@@ -10,11 +10,11 @@ import (
 type SessionState = string
 
 const (
-	SessionStateMatchMaking = "SessionStateMatchMaking"
-	SessionStatePreparation = "SessionStatePreparation"
-	SessionStatePlayer1Turn = "SessionStatePlayer1Turn"
-	SessionStatePlayer2Turn = "SessionStatePlayer2Turn"
-	SessionStateEnded       = "SessionStateEnded"
+	SessionStateMatchMaking = "MATCH_MAKING"
+	SessionStatePreparation = "PREPARATION"
+	SessionStatePlayer1Turn = "PLAYER_1_TURN"
+	SessionStatePlayer2Turn = "PLAYER_2_TURN"
+	SessionStateEnded       = "ENDED"
 )
 
 type Session struct {
@@ -26,9 +26,9 @@ type Session struct {
 }
 
 type State struct {
-	Id       string
-	Type     SessionState
-	Deadline time.Time
+	Id       string       `json:"id"`
+	Type     SessionState `json:"name"`
+	Deadline time.Time    `json:"deadline"`
 }
 
 func (session *Session) IsRunning() bool {

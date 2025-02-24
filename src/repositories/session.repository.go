@@ -143,9 +143,9 @@ func (repo *SessionRepositoryV2Impl) DeleteSession(tx databases.BadgerTx, sessio
 	return tx.Delete(PLAYERID_TO_SESSION + session.PlayerIds[1])
 }
 
-func NewSessionRepositoryV2Impl(
+func NewSessionRepositoryV2(
 	badger databases.Badger,
-) *SessionRepositoryV2Impl {
+) SessionRepositoryV2 {
 	return &SessionRepositoryV2Impl{
 		badger: badger,
 	}

@@ -1,6 +1,8 @@
 package websockets
 
 import (
+	"log"
+
 	"pixeltactics.com/match/src/messages"
 
 	"net/http"
@@ -42,11 +44,13 @@ func (client *Client) handleReceive() {
 	for {
 		_, jsonBytes, err := client.Conn.ReadMessage()
 		if err != nil {
+			log.Println(err)
 			break
 		}
 
 		message, err := messages.JsonBytesToMessage(jsonBytes)
 		if err != nil {
+			log.Println(err)
 			continue
 		}
 

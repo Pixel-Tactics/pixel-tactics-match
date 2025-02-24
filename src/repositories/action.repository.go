@@ -138,9 +138,9 @@ func (repo *ActionLogRepositoryImpl) UpdateActionLog(tx databases.BadgerTx, obj 
 	return obj, nil
 }
 
-func NewActionLogRepositoryImpl(
+func NewActionLogRepository(
 	badger databases.Badger,
-) *ActionLogRepositoryImpl {
+) ActionLogRepository {
 	return &ActionLogRepositoryImpl{
 		badger: badger,
 	}

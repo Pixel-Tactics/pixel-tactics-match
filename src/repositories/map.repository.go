@@ -65,9 +65,9 @@ func (repo *MapRepositoryImpl) DeleteMap(tx databases.BadgerTx, sessionId string
 	return tx.Delete(SESSIONID_TO_MAP + sessionId)
 }
 
-func NewMapRepositoryImpl(
+func NewMapRepository(
 	badger databases.Badger,
-) *MapRepositoryImpl {
+) MapRepository {
 	return &MapRepositoryImpl{
 		badger: badger,
 	}

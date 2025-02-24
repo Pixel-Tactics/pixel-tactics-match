@@ -156,9 +156,9 @@ func (repo *HeroRepositoryImpl) DeleteHero(tx databases.BadgerTx, params HeroKey
 	return tx.Delete(BASE_HERO_PREFIX + params.SessionId + "_" + params.PlayerId + "_" + params.BaseHero)
 }
 
-func NewHeroRepositoryImpl(
+func NewHeroRepository(
 	badger databases.Badger,
-) *HeroRepositoryImpl {
+) HeroRepository {
 	return &HeroRepositoryImpl{
 		badger: badger,
 	}

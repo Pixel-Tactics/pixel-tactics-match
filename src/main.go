@@ -2,10 +2,14 @@ package main
 
 import (
 	"net/http"
+	"os"
 
 	"pixeltactics.com/match/src/config"
+	"pixeltactics.com/match/src/core/states"
 	"pixeltactics.com/match/src/databases"
 	"pixeltactics.com/match/src/gateway"
+	"pixeltactics.com/match/src/heroes"
+	"pixeltactics.com/match/src/repositories"
 	"pixeltactics.com/match/src/services"
 	"pixeltactics.com/match/src/utils/cloud"
 	"pixeltactics.com/match/src/websockets"
@@ -19,13 +23,35 @@ func main() {
 	godotenv.Load()
 	config.Setup()
 
+	os.RemoveAll("./temp/badger") // Debug
+
 	badger := databases.NewBadgerImpl()
 	defer badger.Close()
 
 	validator := validator.New()
+
+	heroFactory := heroes.NewBaseHeroFactory()
+	stateFactory := states.NewSessionStateFactory()
+
+	mapRepo := repositories.NewMapRepository(badger)
+	heroRepo := repositories.NewHeroRepository(badger)
+	playerRepo := repositories.NewPlayerRepository(badger)
+	sessionRepo := repositories.NewSessionRepositoryV2(badger)
+
 	authService := services.NewAuthService()
+	mapService := services.NewMapService(mapRepo, nil)
+	heroService := services.NewHeroService(heroRepo, nil, nil, heroFactory, badger)
+	playerService := services.NewPlayerService(playerRepo, nil)
+	sessionService := services.NewSessionService(mapService, heroService, playerService, sessionRepo, stateFactory, badger)
+
+	mapService.SetHeroService(heroService)
+	playerService.SetSessionService(sessionService)
+	heroService.SetSessionService(sessionService)
+	heroService.SetPlayerService(playerService)
+
 	authGateway := gateway.NewAuthGateway(authService, validator)
-	gatewayRouter := gateway.NewRouter(authGateway)
+	sessionGateway := gateway.NewSessionGateway(sessionService, validator)
+	gatewayRouter := gateway.NewRouter(authGateway, sessionGateway)
 	clientHub := websockets.NewClientHub(gatewayRouter)
 	go clientHub.Run()
 

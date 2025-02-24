@@ -12,15 +12,17 @@ type MapService interface {
 	GetSessionMap(tx databases.BadgerTx, sessionId string) (*models.Map, error)
 	GenerateMap(tx databases.BadgerTx, sessionId string) (*models.Map, error)
 	IsPointOpen(tx databases.BadgerTx, session *models.Session, pos physics.Point) (bool, error)
+
+	SetHeroService(heroService HeroService)
 }
 
 type MapServiceImpl struct {
-	mapRepository repositories.MapRepository
-	heroService   HeroService
+	MapRepository repositories.MapRepository
+	HeroService   HeroService
 }
 
 func (service *MapServiceImpl) GetSessionMap(tx databases.BadgerTx, sessionId string) (*models.Map, error) {
-	sessionMap := service.mapRepository.GetMapBySessionId(tx, sessionId)
+	sessionMap := service.MapRepository.GetMapBySessionId(tx, sessionId)
 	if sessionMap == nil {
 		return nil, exceptions.SessionNotFound()
 	}
@@ -28,7 +30,7 @@ func (service *MapServiceImpl) GetSessionMap(tx databases.BadgerTx, sessionId st
 }
 
 func (service *MapServiceImpl) GenerateMap(tx databases.BadgerTx, sessionId string) (*models.Map, error) {
-	return service.mapRepository.CreateMap(tx, repositories.CreateMapParams{
+	return service.MapRepository.CreateMap(tx, repositories.CreateMapParams{
 		SessionId: sessionId,
 		Structure: [][]int{
 			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -49,12 +51,12 @@ func (service *MapServiceImpl) IsPointOpen(tx databases.BadgerTx, session *model
 	playerId1 := session.PlayerIds[0]
 	playerId2 := session.PlayerIds[1]
 
-	heroes1, err := service.heroService.GetPlayerHeroes(tx, session.Id, playerId1)
+	heroes1, err := service.HeroService.GetPlayerHeroes(tx, session.Id, playerId1)
 	if err != nil {
 		return false, err
 	}
 
-	heroes2, err := service.heroService.GetPlayerHeroes(tx, session.Id, playerId2)
+	heroes2, err := service.HeroService.GetPlayerHeroes(tx, session.Id, playerId2)
 	if err != nil {
 		return false, err
 	}
@@ -75,4 +77,18 @@ func (service *MapServiceImpl) IsPointOpen(tx databases.BadgerTx, session *model
 	}
 	curValue := sessionMap.Structure[pos.Y][pos.X]
 	return curValue != 2, nil
+}
+
+func (service *MapServiceImpl) SetHeroService(heroService HeroService) {
+	service.HeroService = heroService
+}
+
+func NewMapService(
+	mapRepository repositories.MapRepository,
+	heroService HeroService,
+) MapService {
+	return &MapServiceImpl{
+		MapRepository: mapRepository,
+		HeroService:   heroService,
+	}
 }

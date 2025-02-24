@@ -13,3 +13,7 @@ func (factory *BaseHeroFactoryImpl) Create(name BaseHeroEnum) BaseHero {
 		return NewMage()
 	}
 }
+
+func NewBaseHeroFactory() BaseHeroFactory {
+	return &BaseHeroFactoryImpl{}
+}
