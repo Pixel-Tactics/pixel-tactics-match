@@ -19,12 +19,13 @@ const (
 type HeroService interface {
 	GetStats(heroName heroes.BaseHeroEnum) *heroes.BaseHeroInfo
 	GetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string) ([]*models.Hero, error)
-	GetPlayerHero(tx databases.BadgerTx, sessionId string, playerId string, baseHero heroes.BaseHeroEnum) *models.Hero
+	GetPlayerHero(tx databases.BadgerTx, sessionId string, playerId string, baseHero heroes.BaseHeroEnum) (*models.Hero, error)
 	GetAvailableHeroes() []heroes.BaseHeroEnum
 	CreateHeroesTx(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
 	CreateHeroes(sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
 	InitHeroPosition(heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
 	InitHeroPositionTx(tx databases.BadgerTx, heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
+	GetInitialState(tx databases.BadgerTx, heroList1 []*models.Hero, heroList2 []*models.Hero) ([]*models.Hero, []*models.Hero, error)
 
 	ApplyDamage(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, trgHero *models.Hero, damage int) error
 	MoveHero(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, position physics.Point) error
@@ -67,7 +68,7 @@ func (service *HeroServiceImpl) GetPlayerHeroes(tx databases.BadgerTx, sessionId
 	return service.HeroRepository.GetPlayerHeroes(nil, sessionId, playerId, player.HeroBases)
 }
 
-func (service *HeroServiceImpl) GetPlayerHero(tx databases.BadgerTx, sessionId string, playerId string, baseHero heroes.BaseHeroEnum) *models.Hero {
+func (service *HeroServiceImpl) GetPlayerHero(tx databases.BadgerTx, sessionId string, playerId string, baseHero heroes.BaseHeroEnum) (*models.Hero, error) {
 	return service.HeroRepository.GetHeroBySessionId(nil, repositories.HeroKey{
 		SessionId: sessionId,
 		PlayerId:  playerId,
@@ -81,8 +82,7 @@ func (service *HeroServiceImpl) GetStats(heroName heroes.BaseHeroEnum) *heroes.B
 }
 
 func (service *HeroServiceImpl) MoveHero(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, position physics.Point) error {
-	srcHero.Position = position
-	srcHero.LastMoveTurn = currentTurn
+	srcHero.MovePosition(currentTurn, position)
 
 	_, err := service.HeroRepository.SaveHero(tx, srcHero)
 	if err != nil {
@@ -107,8 +107,8 @@ func (service *HeroServiceImpl) onMove(data interface{}) error {
 }
 
 func (service *HeroServiceImpl) ApplyDamage(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, trgHero *models.Hero, damage int) error {
-	srcHero.LastAttackTurn = currentTurn
-	trgHero.Health = max(trgHero.Health-damage, 0)
+	srcHero.Attack(currentTurn)
+	trgHero.Damage(damage)
 
 	_, err := service.HeroRepository.SaveHero(tx, srcHero)
 	if err != nil {
@@ -144,7 +144,11 @@ func (service *HeroServiceImpl) GetAvailableHeroes() []heroes.BaseHeroEnum {
 }
 
 func (service *HeroServiceImpl) CreateHeroesTx(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error {
-	session := service.SessionService.GetSessionById(tx, sessionId)
+	// TODO: check whether not assigned returns error too or nil.. if error, which error (repo)
+	session, err := service.SessionService.GetSessionById(tx, sessionId)
+	if err != nil {
+		return err
+	}
 	if session == nil {
 		return exceptions.SessionNotFound()
 	}
@@ -170,7 +174,7 @@ func (service *HeroServiceImpl) CreateHeroesTx(tx databases.BadgerTx, sessionId 
 		}
 	}
 
-	err := service.PlayerService.SetPlayerHeroes(tx, sessionId, playerId, chosen)
+	err = service.PlayerService.SetPlayerHeroes(tx, sessionId, playerId, chosen)
 	if err != nil {
 		return err
 	}
@@ -210,6 +214,10 @@ func (service *HeroServiceImpl) InitHeroPositionTx(
 			if err != nil {
 				return err
 			}
+			_, err = service.HeroRepository.SaveInitialHero(tx, heroList1[i])
+			if err != nil {
+				return err
+			}
 		} else {
 			break
 		}
@@ -222,12 +230,16 @@ func (service *HeroServiceImpl) InitHeroPositionTx(
 			if err != nil {
 				return err
 			}
+			_, err = service.HeroRepository.SaveInitialHero(tx, heroList2[i])
+			if err != nil {
+				return err
+			}
 		} else {
 			break
 		}
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 func (service *HeroServiceImpl) InitHeroPosition(
@@ -250,6 +262,49 @@ func (service *HeroServiceImpl) InitHeroPosition(
 	}
 
 	return nil
+}
+
+func (service *HeroServiceImpl) GetInitialState(
+	tx databases.BadgerTx,
+	heroList1 []*models.Hero,
+	heroList2 []*models.Hero,
+) ([]*models.Hero, []*models.Hero, error) {
+	initList1 := make([]*models.Hero, 0)
+	initList2 := make([]*models.Hero, 0)
+	for _, hero := range heroList1 {
+		obj, err := service.HeroRepository.GetInitialHero(tx, hero.SessionId, hero.PlayerId, hero.BaseHero)
+		if err != nil {
+			return nil, nil, err
+		}
+		initList1 = append(initList1, obj)
+	}
+	for _, hero := range heroList2 {
+		obj, err := service.HeroRepository.GetInitialHero(tx, hero.SessionId, hero.PlayerId, hero.BaseHero)
+		if err != nil {
+			return nil, nil, err
+		}
+		initList2 = append(initList2, obj)
+	}
+	return initList1, initList2, nil
+	// heroList := heroList1
+	// heroList = append(heroList, heroList2...)
+
+	// for i, hero := range heroList {
+	// 	if i < len(heroList1) {
+	// 		_, err := service.HeroRepository.GetInitialHero(tx, hero.SessionId, hero.PlayerId, hero.BaseHero)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		_, err = service.HeroRepository.SaveHero(tx, hero)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 	} else {
+	// 		break
+	// 	}
+	// }
+
+	// return nil
 }
 
 func (service *HeroServiceImpl) isChosenHeroesValid(available []heroes.BaseHeroEnum, chosen []heroes.BaseHeroEnum) bool {

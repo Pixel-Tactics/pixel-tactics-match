@@ -8,9 +8,25 @@ import (
 	"pixeltactics.com/match/src/utils/physics"
 )
 
+func getMapTemplate() [][]int {
+	return [][]int{
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 1, 1, 1, 2, 2, 2, 2, 2, 2},
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 1, 1, 1, 4, 3, 1, 1, 1, 1},
+		{2, 2, 2, 2, 2, 2, 1, 1, 1, 1},
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	}
+}
+
 type MapService interface {
 	GetSessionMap(tx databases.BadgerTx, sessionId string) (*models.Map, error)
 	GenerateMap(tx databases.BadgerTx, sessionId string) (*models.Map, error)
+	GetInitialState(tx databases.BadgerTx, sessionId string) (*models.Map, error)
 	IsPointOpen(tx databases.BadgerTx, session *models.Session, pos physics.Point) (bool, error)
 
 	SetHeroService(heroService HeroService)
@@ -30,20 +46,9 @@ func (service *MapServiceImpl) GetSessionMap(tx databases.BadgerTx, sessionId st
 }
 
 func (service *MapServiceImpl) GenerateMap(tx databases.BadgerTx, sessionId string) (*models.Map, error) {
-	return service.MapRepository.CreateMap(tx, repositories.CreateMapParams{
+	return service.MapRepository.SaveMap(tx, &models.Map{
 		SessionId: sessionId,
-		Structure: [][]int{
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-			{1, 1, 1, 1, 2, 2, 2, 2, 2, 2},
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-			{1, 1, 1, 1, 4, 3, 1, 1, 1, 1},
-			{2, 2, 2, 2, 2, 2, 1, 1, 1, 1},
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-		},
+		Structure: getMapTemplate(),
 	})
 }
 
@@ -77,6 +82,13 @@ func (service *MapServiceImpl) IsPointOpen(tx databases.BadgerTx, session *model
 	}
 	curValue := sessionMap.Structure[pos.Y][pos.X]
 	return curValue != 2, nil
+}
+
+func (service *MapServiceImpl) GetInitialState(tx databases.BadgerTx, sessionId string) (*models.Map, error) {
+	return &models.Map{
+		SessionId: sessionId,
+		Structure: getMapTemplate(),
+	}, nil
 }
 
 func (service *MapServiceImpl) SetHeroService(heroService HeroService) {

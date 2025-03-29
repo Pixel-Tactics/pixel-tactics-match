@@ -9,13 +9,16 @@ import (
 )
 
 const (
-	BASE_HERO_PREFIX = "hero_"
+	BASE_HERO_PREFIX    = "hero_"
+	BASE_INITIAL_PREFIX = "initial_hero_"
 )
 
 type HeroRepository interface {
 	GetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string, bases []heroes.BaseHeroEnum) ([]*models.Hero, error)
-	GetHeroBySessionId(tx databases.BadgerTx, params HeroKey) *models.Hero
+	GetHeroBySessionId(tx databases.BadgerTx, params HeroKey) (*models.Hero, error)
 	SaveHero(tx databases.BadgerTx, params *models.Hero) (*models.Hero, error)
+	GetInitialHero(tx databases.BadgerTx, sessionId string, playerId string, baseHero string) (*models.Hero, error)
+	SaveInitialHero(tx databases.BadgerTx, obj *models.Hero) (*models.Hero, error)
 	// UpdateHero(params UpdateHeroParams) (*models.Hero, error)
 	// BatchUpdateHero(params []UpdateHeroParams) error
 	// BatchCreateHeroes(params []CreateHeroParams) ([]*models.Hero, error)
@@ -47,21 +50,43 @@ func (repo *HeroRepositoryImpl) GetPlayerHeroes(tx databases.BadgerTx, sessionId
 	return ret, nil
 }
 
-func (repo *HeroRepositoryImpl) GetHeroBySessionId(tx databases.BadgerTx, params HeroKey) *models.Hero {
+// TODO: check whether not assigned returns error or nil.. if error, which error
+func (repo *HeroRepositoryImpl) GetHeroBySessionId(tx databases.BadgerTx, params HeroKey) (*models.Hero, error) {
 	query := databases.GetQuery(tx, repo.badger)
 
 	var hero models.Hero
 	err := query.Get(BASE_HERO_PREFIX+params.SessionId+"_"+params.PlayerId+"_"+params.BaseHero, &hero)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return &hero
+	return &hero, nil
 }
 
 func (repo *HeroRepositoryImpl) SaveHero(tx databases.BadgerTx, obj *models.Hero) (*models.Hero, error) {
 	query := databases.GetQuery(tx, repo.badger)
 
 	err := query.Set(BASE_HERO_PREFIX+obj.SessionId+"_"+obj.PlayerId+"_"+obj.BaseHero, obj)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+func (repo *HeroRepositoryImpl) GetInitialHero(tx databases.BadgerTx, sessionId string, playerId string, baseHero string) (*models.Hero, error) {
+	query := databases.GetQuery(tx, repo.badger)
+
+	var hero models.Hero
+	err := query.Get(BASE_INITIAL_PREFIX+sessionId+"_"+playerId+"_"+baseHero, &hero)
+	if err != nil {
+		return nil, err
+	}
+	return &hero, nil
+}
+
+func (repo *HeroRepositoryImpl) SaveInitialHero(tx databases.BadgerTx, obj *models.Hero) (*models.Hero, error) {
+	query := databases.GetQuery(tx, repo.badger)
+
+	err := query.Set(BASE_INITIAL_PREFIX+obj.SessionId+"_"+obj.PlayerId+"_"+obj.BaseHero, obj)
 	if err != nil {
 		return nil, err
 	}

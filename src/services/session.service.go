@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/google/uuid"
 	"pixeltactics.com/match/src/core/states"
 	"pixeltactics.com/match/src/databases"
 	"pixeltactics.com/match/src/exceptions"
@@ -21,8 +22,8 @@ const (
 )
 
 type SessionService interface {
-	GetSessionById(tx databases.BadgerTx, sessionId string) *models.Session
-	GetSessionByPlayerId(playerId string) *models.Session
+	GetSessionById(tx databases.BadgerTx, sessionId string) (*models.Session, error)
+	GetSessionByPlayerId(playerId string) (*models.Session, error)
 	CreateSession(playerId string, opponentId string) (*models.Session, error)
 	PreparePlayer(playerId string, chosenHeroes []heroes.BaseHeroEnum) (bool, error)
 	CompileSession(sessionId string) (map[string]interface{}, error)
@@ -38,15 +39,18 @@ type SessionServiceImpl struct {
 	TransactionManager databases.TransactionManager
 }
 
-func (service *SessionServiceImpl) GetSessionById(tx databases.BadgerTx, sessionId string) *models.Session {
+func (service *SessionServiceImpl) GetSessionById(tx databases.BadgerTx, sessionId string) (*models.Session, error) {
+	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 	return service.SessionRepository.GetSessionById(tx, sessionId)
 }
 
-func (service *SessionServiceImpl) GetSessionByPlayerIdTx(tx databases.BadgerTx, playerId string) *models.Session {
+func (service *SessionServiceImpl) GetSessionByPlayerIdTx(tx databases.BadgerTx, playerId string) (*models.Session, error) {
+	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 	return service.SessionRepository.GetSessionByPlayerId(tx, playerId)
 }
 
-func (service *SessionServiceImpl) GetSessionByPlayerId(playerId string) *models.Session {
+func (service *SessionServiceImpl) GetSessionByPlayerId(playerId string) (*models.Session, error) {
+	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 	return service.SessionRepository.GetSessionByPlayerId(nil, playerId)
 }
 
@@ -67,7 +71,12 @@ func (service *SessionServiceImpl) CreateSession(playerId string, opponentId str
 	// Session object is already created (by opponent)
 	if isStart {
 		log.Println("STARTING...")
-		oppSession := service.SessionRepository.GetSessionByPlayerId(tx, opponentId)
+		// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
+		oppSession, err := service.SessionRepository.GetSessionByPlayerId(tx, opponentId)
+		if err != nil {
+			log.Fatalln(err)
+			return nil, err
+		}
 		if oppSession == nil {
 			log.Fatalln("session found before but now not")
 			return nil, errors.New("server cannot get opponent session")
@@ -85,11 +94,20 @@ func (service *SessionServiceImpl) CreateSession(playerId string, opponentId str
 
 	// Session object is not created, so create it
 	availHeroes := service.HeroService.GetAvailableHeroes()
-	session, err := service.SessionRepository.CreateSession(tx, repositories.CreateSessionParams{
-		PlayerId1:         playerId,
-		PlayerId2:         opponentId,
-		AvailableHeroList: availHeroes,
-	})
+	sessionId := uuid.New().String()
+	session := &models.Session{
+		Id: sessionId,
+		State: models.State{
+			Id:   uuid.New().String(),
+			Type: models.SessionStateMatchMaking,
+		},
+		AllowedHeroList: availHeroes,
+		PlayerIds: []string{
+			playerId,
+			opponentId,
+		},
+	}
+	_, err = service.SessionRepository.SaveSession(tx, session)
 	if err != nil {
 		return nil, err
 	}
@@ -121,15 +139,12 @@ func (service *SessionServiceImpl) runSession(tx databases.BadgerTx, session *mo
 	if err != nil {
 		panic("PANIC: invalid session state")
 	}
-	newSession, err := service.SessionRepository.UpdateSession(tx, repositories.UpdateSessionParams{
-		SessionId: session.Id,
-		State:     session.State,
-	})
+	_, err = service.SessionRepository.SaveSession(tx, session)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
-	log.Println(newSession)
+	log.Println(session)
 	time.AfterFunc(time.Until(preparationDeadline), func() {
 		service.checkForExpire(tx, session, session.State.Id)
 	})
@@ -140,7 +155,11 @@ func (service *SessionServiceImpl) PreparePlayer(playerId string, chosenHeroes [
 	tx := service.TransactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
 
-	session := service.SessionRepository.GetSessionByPlayerId(tx, playerId)
+	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
+	session, err := service.SessionRepository.GetSessionByPlayerId(tx, playerId)
+	if err != nil {
+		return false, err
+	}
 	if session == nil || session.State.Type != models.SessionStatePreparation {
 		return false, exceptions.ActionNotAllowed()
 	}
@@ -149,7 +168,7 @@ func (service *SessionServiceImpl) PreparePlayer(playerId string, chosenHeroes [
 		return false, exceptions.ExceededDeadlineError()
 	}
 
-	err := service.HeroService.CreateHeroesTx(tx, session.Id, playerId, chosenHeroes)
+	err = service.HeroService.CreateHeroesTx(tx, session.Id, playerId, chosenHeroes)
 	if err != nil {
 		return false, err
 	}
@@ -164,6 +183,7 @@ func (service *SessionServiceImpl) PreparePlayer(playerId string, chosenHeroes [
 	if err == nil || otherPlayerNotPicked {
 		err = tx.Commit()
 		if err != nil {
+			log.Println("Error when commiting player preparation")
 			return false, err
 		}
 		return !otherPlayerNotPicked, nil
@@ -219,11 +239,7 @@ func (service *SessionServiceImpl) StartBattle(tx databases.BadgerTx, session *m
 		return err
 	}
 
-	_, err = service.SessionRepository.UpdateSession(tx, repositories.UpdateSessionParams{
-		SessionId: session.Id,
-		State:     session.State,
-		WinnerId:  session.WinnerId,
-	})
+	_, err = service.SessionRepository.SaveSession(tx, session)
 	if err != nil {
 		return err
 	}
@@ -241,15 +257,19 @@ func (service *SessionServiceImpl) checkForExpire(tx databases.BadgerTx, session
 	if err != nil {
 		return err
 	}
-	service.SessionRepository.UpdateSession(tx, repositories.UpdateSessionParams{
-		SessionId: session.Id,
-		State:     session.State,
-	})
+	_, err = service.SessionRepository.SaveSession(tx, session)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func (service *SessionServiceImpl) checkPlayerSession(tx databases.BadgerTx, playerId string) error {
-	plrSession := service.SessionRepository.GetSessionByPlayerId(tx, playerId)
+	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
+	plrSession, err := service.SessionRepository.GetSessionByPlayerId(tx, playerId)
+	if err != nil {
+		return err
+	}
 	if plrSession != nil && plrSession.IsRunning() {
 		return errors.New("player is in running session")
 	}
@@ -257,7 +277,11 @@ func (service *SessionServiceImpl) checkPlayerSession(tx databases.BadgerTx, pla
 }
 
 func (service *SessionServiceImpl) checkOpponentSession(tx databases.BadgerTx, playerId string, opponentId string) (bool, error) {
-	oppSession := service.SessionRepository.GetSessionByPlayerId(tx, opponentId)
+	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
+	oppSession, err := service.SessionRepository.GetSessionByPlayerId(tx, opponentId)
+	if err != nil {
+		return false, err
+	}
 	log.Println(oppSession)
 	if oppSession != nil {
 		if oppSession.IsRunning() {
@@ -277,7 +301,11 @@ func (service *SessionServiceImpl) CompileSession(sessionId string) (map[string]
 	// 	actionData["order"] = i
 	// 	actionLogData = append(actionLogData, actionData)
 	// }
-	session := service.GetSessionById(nil, sessionId)
+	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
+	session, err := service.GetSessionById(nil, sessionId)
+	if err != nil {
+		return nil, err
+	}
 	state, err := convert_utils.ObjectToMap(session.State)
 	if err != nil {
 		return nil, err

@@ -37,7 +37,12 @@ func (gateway *SessionGatewayImpl) GetIsPlayerInSession(client *messages.WebSock
 		return
 	}
 
-	session := gateway.SessionService.GetSessionByPlayerId(body.PlayerId)
+	// TODO: check whether not assigned returns error too or nil.. if error, which error
+	session, err := gateway.SessionService.GetSessionByPlayerId(body.PlayerId)
+	if err != nil {
+		client.SendBack(Error(err))
+		return
+	}
 	client.SendBack(&messages.Message{
 		Type:       client.Message.Type,
 		Identifier: client.Message.Identifier,
@@ -61,7 +66,12 @@ func (gateway *SessionGatewayImpl) GetSession(client *messages.WebSocketMessager
 		return
 	}
 
-	session := gateway.SessionService.GetSessionByPlayerId(body.PlayerId)
+	// TODO: check whether not assigned returns error too or nil.. if error, which error
+	session, err := gateway.SessionService.GetSessionByPlayerId(body.PlayerId)
+	if err != nil {
+		client.SendBack(Error(err))
+		return
+	}
 	if session == nil {
 		client.SendBack(Error(errors.New("player is not in session")))
 		return

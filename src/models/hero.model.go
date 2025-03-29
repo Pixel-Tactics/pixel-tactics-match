@@ -17,6 +17,19 @@ type Hero struct {
 	SessionId string
 }
 
+func (hero *Hero) MovePosition(currentTurn int, position physics.Point) {
+	hero.Position = position
+	hero.LastMoveTurn = currentTurn
+}
+
+func (hero *Hero) Attack(currentTurn int) {
+	hero.LastAttackTurn = currentTurn
+}
+
+func (hero *Hero) Damage(damage int) {
+	hero.Health = max(hero.Health-damage, 0)
+}
+
 func (hero *Hero) CanMoveOnTurn(curPlayerId string, currentTurn int) bool {
 	if hero.Health == 0 || curPlayerId != hero.PlayerId {
 		return false

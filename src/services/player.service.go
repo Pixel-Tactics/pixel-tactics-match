@@ -29,14 +29,18 @@ func (service *PlayerServiceImpl) GetPlayer(tx databases.BadgerTx, playerId stri
 }
 
 func (service *PlayerServiceImpl) CreatePlayerForSession(tx databases.BadgerTx, sessionId string, playerId1 string, playerId2 string) error {
-	session := service.SessionService.GetSessionById(tx, sessionId)
+	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
+	session, err := service.SessionService.GetSessionById(tx, sessionId)
+	if err != nil {
+		return err
+	}
 	if session == nil {
 		return exceptions.SessionNotFound()
 	}
 
 	// TODO: check if player really exists as multilayer protection
 
-	_, err := service.PlayerRepository.CreatePlayer(tx, repositories.CreatePlayerParams{
+	_, err = service.PlayerRepository.CreatePlayer(tx, repositories.CreatePlayerParams{
 		Id:        playerId1,
 		SessionId: sessionId,
 	})

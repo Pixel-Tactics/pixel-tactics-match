@@ -14,7 +14,7 @@ const (
 
 type MapRepository interface {
 	GetMapBySessionId(tx databases.BadgerTx, sessionId string) *models.Map
-	CreateMap(tx databases.BadgerTx, params CreateMapParams) (*models.Map, error)
+	SaveMap(tx databases.BadgerTx, obj *models.Map) (*models.Map, error)
 	DeleteMap(tx databases.BadgerTx, sessionId string) error
 }
 
@@ -38,18 +38,14 @@ func (repo *MapRepositoryImpl) GetMapBySessionId(tx databases.BadgerTx, sessionI
 	return &sessionMap
 }
 
-func (repo *MapRepositoryImpl) CreateMap(tx databases.BadgerTx, params CreateMapParams) (*models.Map, error) {
+func (repo *MapRepositoryImpl) SaveMap(tx databases.BadgerTx, obj *models.Map) (*models.Map, error) {
 	query := databases.GetQuery(tx, repo.badger)
 
-	sessionMap := &models.Map{
-		SessionId: params.SessionId,
-		Structure: params.Structure,
-	}
-	err := query.Set(SESSIONID_TO_MAP+params.SessionId, sessionMap)
+	err := query.Set(SESSIONID_TO_MAP+obj.SessionId, obj)
 	if err != nil {
 		return nil, err
 	}
-	return sessionMap, nil
+	return obj, nil
 }
 
 func (repo *MapRepositoryImpl) DeleteMap(tx databases.BadgerTx, sessionId string) error {

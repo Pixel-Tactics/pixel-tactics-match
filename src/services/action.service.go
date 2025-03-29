@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"pixeltactics.com/match/src/databases"
-	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/models"
 	"pixeltactics.com/match/src/repositories"
 	"pixeltactics.com/match/src/utils/algorithms"
@@ -23,14 +22,18 @@ type ActionServiceImpl struct {
 
 	sessionLogRepository repositories.SessionLogRepository
 	transactionManager   databases.TransactionManager
-	eventManager         events.EventManager
+	// eventManager         events.EventManager
 }
 
 func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHero string, directions []physics.Direction) error {
 	tx := service.transactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
 
-	session := service.sessionService.GetSessionById(tx, sessionId)
+	// TODO: check whether not assigned returns error too or nil.. if error, which error
+	session, err := service.sessionService.GetSessionById(tx, sessionId)
+	if err != nil {
+		return err
+	}
 	if session == nil {
 		return errors.New("invalid session id")
 	}
@@ -40,7 +43,10 @@ func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHe
 		return err
 	}
 
-	srcHero := service.heroService.GetPlayerHero(tx, sessionId, playerId, baseHero)
+	srcHero, err := service.heroService.GetPlayerHero(tx, sessionId, playerId, baseHero)
+	if err != nil {
+		return err
+	}
 	if srcHero == nil {
 		return errors.New("invalid hero")
 	}
@@ -79,47 +85,54 @@ func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHe
 		return err
 	}
 
-	err = service.eventManager.Emit("MOVE", &MoveEvent{
-		Tx:          tx,
-		SrcHero:     srcHero,
-		Position:    curPos,
-		CurrentTurn: session.CurrentTurn,
-	})
+	err = service.heroService.MoveHero(tx, session.CurrentTurn, srcHero, curPos)
 	if err != nil {
 		return err
 	}
+
+	// err = service.eventManager.Emit("MOVE", &MoveEvent{
+	// 	Tx:          tx,
+	// 	SrcHero:     srcHero,
+	// 	Position:    curPos,
+	// 	CurrentTurn: session.CurrentTurn,
+	// })
+	// if err != nil {
+	// 	return err
+	// }
 
 	err = tx.Commit()
 	if err != nil {
 		return err
 	}
 	return nil
-
-	// service.heroService.MoveHero(tx, actionLog.Order, srcHero, curPos)
-
-	// err = tx.Commit()
-	// if err != nil {
-	// 	return err
-	// }
-	// return nil
 }
 
 func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcBaseHero string, dstBaseHero string) error {
 	tx := service.transactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
 
-	session := service.sessionService.GetSessionById(tx, sessionId)
+	// TODO: check whether not assigned returns error too or nil.. if error, which error
+	session, err := service.sessionService.GetSessionById(tx, sessionId)
+	if err != nil {
+		return err
+	}
 	if session == nil {
 		return errors.New("invalid session id")
 	}
 
-	srcHero := service.heroService.GetPlayerHero(tx, sessionId, playerId, srcBaseHero)
+	srcHero, err := service.heroService.GetPlayerHero(tx, sessionId, playerId, srcBaseHero)
+	if err != nil {
+		return err
+	}
 	if srcHero == nil {
 		return errors.New("invalid source hero")
 	}
 
 	otherPlayerId, _ := session.GetOtherPlayerId(playerId)
-	dstHero := service.heroService.GetPlayerHero(tx, sessionId, otherPlayerId, dstBaseHero)
+	dstHero, err := service.heroService.GetPlayerHero(tx, sessionId, otherPlayerId, dstBaseHero)
+	if err != nil {
+		return err
+	}
 	if dstHero == nil {
 		return errors.New("invalid destination hero")
 	}
@@ -161,21 +174,21 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 		return err
 	}
 
-	// err = service.heroService.ApplyDamage(tx, actionLog.Order, srcHero, trgHero, damage)
-	// if err != nil {
-	// 	return err
-	// }
-
-	err = service.eventManager.Emit("DAMAGE", &AttackEvent{
-		Tx:          tx,
-		SrcHero:     srcHero,
-		DstHero:     dstHero,
-		Damage:      damage,
-		CurrentTurn: session.CurrentTurn,
-	})
+	err = service.heroService.ApplyDamage(tx, session.CurrentTurn, srcHero, dstHero, damage)
 	if err != nil {
 		return err
 	}
+
+	// err = service.eventManager.Emit("DAMAGE", &AttackEvent{
+	// 	Tx:          tx,
+	// 	SrcHero:     srcHero,
+	// 	DstHero:     dstHero,
+	// 	Damage:      damage,
+	// 	CurrentTurn: session.CurrentTurn,
+	// })
+	// if err != nil {
+	// 	return err
+	// }
 
 	err = tx.Commit()
 	if err != nil {
