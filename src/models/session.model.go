@@ -23,6 +23,8 @@ type Session struct {
 	AllowedHeroList []heroes.BaseHeroEnum
 	PlayerIds       []string
 	WinnerId        *string
+
+	CurrentTurn int
 }
 
 type State struct {

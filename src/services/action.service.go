@@ -1,136 +1,184 @@
 package services
 
+import (
+	"errors"
+
+	"pixeltactics.com/match/src/databases"
+	"pixeltactics.com/match/src/events"
+	"pixeltactics.com/match/src/models"
+	"pixeltactics.com/match/src/repositories"
+	"pixeltactics.com/match/src/utils/algorithms"
+	"pixeltactics.com/match/src/utils/physics"
+)
+
 type ActionService interface {
-	// GetSessionById(sessionId string) *models.Session
+	Move(sessionId string, playerId string, baseHero string, directions []physics.Direction) error
+	Attack(sessionId string, playerId string, srcBaseHero string, dstBaseHero string) error
 }
 
 type ActionServiceImpl struct {
-	// mapService     MapService
-	// heroService    HeroService
-	// sessionService SessionService
+	mapService     MapService
+	heroService    HeroService
+	sessionService SessionService
 
-	// actionRepository   repositories.ActionLogRepository
-	// transactionManager databases.TransactionManager
+	sessionLogRepository repositories.SessionLogRepository
+	transactionManager   databases.TransactionManager
+	eventManager         events.EventManager
 }
 
-// func (service *ActionServiceImpl) Move(actionLog *models.ActionLog) error {
-// 	session := service.sessionService.GetSessionById(actionLog.SessionId)
-// 	if session == nil {
-// 		return errors.New("invalid session id")
-// 	}
+func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHero string, directions []physics.Direction) error {
+	tx := service.transactionManager.NewReadWriteTransaction()
+	defer tx.Discard()
 
-// 	activePlayerId, err := session.GetActivePlayer()
-// 	if err != nil {
-// 		return err
-// 	}
+	session := service.sessionService.GetSessionById(tx, sessionId)
+	if session == nil {
+		return errors.New("invalid session id")
+	}
 
-// 	action, ok := actionLog.Action.(*actions.MoveAction)
-// 	if !ok {
-// 		return errors.New("invalid action")
-// 	}
+	activePlayerId, err := session.GetActivePlayer()
+	if err != nil {
+		return err
+	}
 
-// 	srcHero, err := service.heroService.GetPlayerHero(actionLog.SessionId, actionLog.PlayerId, action.SourceHero)
-// 	if err != nil {
-// 		return err
-// 	}
+	srcHero := service.heroService.GetPlayerHero(tx, sessionId, playerId, baseHero)
+	if srcHero == nil {
+		return errors.New("invalid hero")
+	}
 
-// 	if !srcHero.CanMoveOnTurn(activePlayerId, actionLog.Turn) {
-// 		return errors.New("hero cannot move")
-// 	}
+	if !srcHero.CanMoveOnTurn(activePlayerId, session.CurrentTurn) {
+		return errors.New("hero cannot move")
+	}
 
-// 	srcHeroStats := service.heroService.GetStats(srcHero.BaseHero)
-// 	if len(action.DirectionList) > srcHeroStats.BaseStats.MoveRange {
-// 		return errors.New("invalid movement range")
-// 	}
+	srcHeroStats := service.heroService.GetStats(srcHero.BaseHero)
+	if len(directions) > srcHeroStats.BaseStats.MoveRange {
+		return errors.New("invalid movement range")
+	}
 
-// 	curPos := srcHero.Position
-// 	for _, dir := range action.DirectionList {
-// 		dirPoint := physics.GetPointFromDirection(dir)
-// 		curPos = curPos.Add(dirPoint)
-// 		isPointOpen, err := service.mapService.IsPointOpen(session, curPos)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		if !isPointOpen {
-// 			return errors.New("point is occupied")
-// 		}
-// 	}
+	curPos := srcHero.Position
+	for _, dir := range directions {
+		dirPoint := physics.GetPointFromDirection(dir)
+		curPos = curPos.Add(dirPoint)
+		isPointOpen, err := service.mapService.IsPointOpen(tx, session, curPos)
+		if err != nil {
+			return err
+		}
+		if !isPointOpen {
+			return errors.New("point is occupied")
+		}
+	}
 
-// 	tx := service.transactionManager.NewReadWriteTransaction()
-// 	defer tx.Discard()
+	_, err = service.sessionLogRepository.AppendLog(tx, sessionId, &models.SessionLog{
+		Type: "MOVE",
+		Data: map[string]interface{}{
+			"playerId": playerId,
+			"baseHero": baseHero,
+			"point":    curPos,
+		},
+	})
+	if err != nil {
+		return err
+	}
 
-// 	service.heroService.MoveHero(tx, actionLog.Order, srcHero, curPos)
+	err = service.eventManager.Emit("move", map[string]interface{}{
+		"tx":    tx,
+		"hero":  srcHero,
+		"point": curPos,
+	})
+	if err != nil {
+		return err
+	}
 
-// 	err = tx.Commit()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
 
-// func (service *ActionServiceImpl) Attack(actionLog *models.ActionLog) error {
-// 	session := service.sessionService.GetSessionById(actionLog.SessionId)
-// 	if session == nil {
-// 		return errors.New("invalid session id")
-// 	}
+	// service.heroService.MoveHero(tx, actionLog.Order, srcHero, curPos)
 
-// 	action, ok := actionLog.Action.(*actions.AttackAction)
-// 	if !ok {
-// 		return errors.New("invalid action")
-// 	}
+	// err = tx.Commit()
+	// if err != nil {
+	// 	return err
+	// }
+	// return nil
+}
 
-// 	srcHero, err := service.heroService.GetPlayerHero(actionLog.SessionId, actionLog.PlayerId, action.SourceHero)
-// 	if err != nil {
-// 		return err
-// 	}
+func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcBaseHero string, dstBaseHero string) error {
+	tx := service.transactionManager.NewReadWriteTransaction()
+	defer tx.Discard()
 
-// 	otherPlayerId, _ := session.GetOtherPlayerId(actionLog.PlayerId)
-// 	trgHero, err := service.heroService.GetPlayerHero(actionLog.SessionId, otherPlayerId, action.TargetHero)
-// 	if err != nil {
-// 		return err
-// 	}
+	session := service.sessionService.GetSessionById(tx, sessionId)
+	if session == nil {
+		return errors.New("invalid session id")
+	}
 
-// 	activePlayerId, err := session.GetActivePlayer()
-// 	if err != nil {
-// 		return err
-// 	}
+	srcHero := service.heroService.GetPlayerHero(tx, sessionId, playerId, srcBaseHero)
+	if srcHero == nil {
+		return errors.New("invalid source hero")
+	}
 
-// 	if !srcHero.CanAttackOnTurn(activePlayerId, actionLog.Turn) {
-// 		return errors.New("hero cannot attack")
-// 	}
+	otherPlayerId, _ := session.GetOtherPlayerId(playerId)
+	dstHero := service.heroService.GetPlayerHero(tx, sessionId, otherPlayerId, dstBaseHero)
+	if dstHero == nil {
+		return errors.New("invalid destination hero")
+	}
 
-// 	srcHeroStats := service.heroService.GetStats(srcHero.BaseHero)
+	activePlayerId, err := session.GetActivePlayer()
+	if err != nil {
+		return err
+	}
 
-// 	attackRange := srcHeroStats.BaseStats.AttackRange
-// 	damage := srcHeroStats.BaseStats.Damage
+	if !srcHero.CanAttackOnTurn(activePlayerId, session.CurrentTurn) {
+		return errors.New("hero cannot attack")
+	}
 
-// 	sessionMap, err := service.mapService.GetSessionMap(session.Id)
-// 	if err != nil {
-// 		return err
-// 	}
+	srcHeroStats := service.heroService.GetStats(srcHero.BaseHero)
 
-// 	dist, err := algorithms.CheckDistance(sessionMap.Structure, srcHero.Position, trgHero.Position)
-// 	if dist > attackRange || err != nil {
-// 		return errors.New("target out of range")
-// 	}
+	attackRange := srcHeroStats.BaseStats.AttackRange
+	damage := srcHeroStats.BaseStats.Damage
 
-// 	tx := service.transactionManager.NewReadWriteTransaction()
-// 	defer tx.Discard()
+	sessionMap, err := service.mapService.GetSessionMap(tx, sessionId)
+	if err != nil {
+		return err
+	}
 
-// 	action.Damage = damage
-// 	_, err = service.actionRepository.UpdateActionLog(tx, actionLog)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	err = service.heroService.ApplyDamage(tx, actionLog.Order, srcHero, trgHero, damage)
-// 	if err != nil {
-// 		return err
-// 	}
+	dist, err := algorithms.CheckDistance(sessionMap.Structure, srcHero.Position, dstHero.Position)
+	if dist > attackRange || err != nil {
+		return errors.New("target out of range")
+	}
 
-// 	err = tx.Commit()
-// 	if err != nil {
-// 		return err
-// 	}
+	_, err = service.sessionLogRepository.AppendLog(tx, sessionId, &models.SessionLog{
+		Type: "ATTACK",
+		Data: map[string]interface{}{
+			"playerId":    playerId,
+			"srcBaseHero": srcBaseHero,
+			"dstBaseHero": dstBaseHero,
+			"damage":      damage,
+		},
+	})
+	if err != nil {
+		return err
+	}
 
-// 	return nil
-// }
+	// err = service.heroService.ApplyDamage(tx, actionLog.Order, srcHero, trgHero, damage)
+	// if err != nil {
+	// 	return err
+	// }
+
+	err = service.eventManager.Emit("move", map[string]interface{}{
+		"tx":      tx,
+		"srcHero": srcHero,
+		"dstHero": dstHero,
+		"damage":  damage,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

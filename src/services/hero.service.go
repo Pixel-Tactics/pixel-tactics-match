@@ -18,7 +18,7 @@ const (
 type HeroService interface {
 	GetStats(heroName heroes.BaseHeroEnum) *heroes.BaseHeroInfo
 	GetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string) ([]*models.Hero, error)
-	GetPlayerHero(sessionId string, playerId string, baseHero heroes.BaseHeroEnum) *models.Hero
+	GetPlayerHero(tx databases.BadgerTx, sessionId string, playerId string, baseHero heroes.BaseHeroEnum) *models.Hero
 	GetAvailableHeroes() []heroes.BaseHeroEnum
 	CreateHeroesTx(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
 	CreateHeroes(sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
@@ -50,7 +50,7 @@ func (service *HeroServiceImpl) GetPlayerHeroes(tx databases.BadgerTx, sessionId
 	return service.HeroRepository.GetPlayerHeroes(nil, sessionId, playerId, player.HeroBases)
 }
 
-func (service *HeroServiceImpl) GetPlayerHero(sessionId string, playerId string, baseHero heroes.BaseHeroEnum) *models.Hero {
+func (service *HeroServiceImpl) GetPlayerHero(tx databases.BadgerTx, sessionId string, playerId string, baseHero heroes.BaseHeroEnum) *models.Hero {
 	return service.HeroRepository.GetHeroBySessionId(nil, repositories.HeroKey{
 		SessionId: sessionId,
 		PlayerId:  playerId,
