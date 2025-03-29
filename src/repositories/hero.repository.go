@@ -9,14 +9,15 @@ import (
 )
 
 const (
-	BASE_HERO_PREFIX    = "hero_"
-	BASE_INITIAL_PREFIX = "initial_hero_"
+	BASE_HERO_PREFIX         = "hero_"
+	BASE_HERO_INITIAL_PREFIX = "initial_hero_"
 )
 
 type HeroRepository interface {
 	GetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string, bases []heroes.BaseHeroEnum) ([]*models.Hero, error)
 	GetHeroBySessionId(tx databases.BadgerTx, params HeroKey) (*models.Hero, error)
 	SaveHero(tx databases.BadgerTx, params *models.Hero) (*models.Hero, error)
+	SaveHeroes(tx databases.BadgerTx, heroList []*models.Hero) ([]*models.Hero, error)
 	GetInitialHero(tx databases.BadgerTx, sessionId string, playerId string, baseHero string) (*models.Hero, error)
 	SaveInitialHero(tx databases.BadgerTx, obj *models.Hero) (*models.Hero, error)
 	// UpdateHero(params UpdateHeroParams) (*models.Hero, error)
@@ -72,11 +73,25 @@ func (repo *HeroRepositoryImpl) SaveHero(tx databases.BadgerTx, obj *models.Hero
 	return obj, nil
 }
 
+func (repo *HeroRepositoryImpl) SaveHeroes(tx databases.BadgerTx, heroList []*models.Hero) ([]*models.Hero, error) {
+	if tx == nil {
+		return nil, errors.New("transaction object is null")
+	}
+
+	for _, hero := range heroList {
+		_, err := repo.SaveHero(tx, hero)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return heroList, nil
+}
+
 func (repo *HeroRepositoryImpl) GetInitialHero(tx databases.BadgerTx, sessionId string, playerId string, baseHero string) (*models.Hero, error) {
 	query := databases.GetQuery(tx, repo.badger)
 
 	var hero models.Hero
-	err := query.Get(BASE_INITIAL_PREFIX+sessionId+"_"+playerId+"_"+baseHero, &hero)
+	err := query.Get(BASE_HERO_INITIAL_PREFIX+sessionId+"_"+playerId+"_"+baseHero, &hero)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +101,7 @@ func (repo *HeroRepositoryImpl) GetInitialHero(tx databases.BadgerTx, sessionId 
 func (repo *HeroRepositoryImpl) SaveInitialHero(tx databases.BadgerTx, obj *models.Hero) (*models.Hero, error) {
 	query := databases.GetQuery(tx, repo.badger)
 
-	err := query.Set(BASE_INITIAL_PREFIX+obj.SessionId+"_"+obj.PlayerId+"_"+obj.BaseHero, obj)
+	err := query.Set(BASE_HERO_INITIAL_PREFIX+obj.SessionId+"_"+obj.PlayerId+"_"+obj.BaseHero, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +193,11 @@ func (repo *HeroRepositoryImpl) DeleteHero(tx databases.BadgerTx, params HeroKey
 	if err != nil {
 		return err
 	}
-	return tx.Delete(BASE_HERO_PREFIX + params.SessionId + "_" + params.PlayerId + "_" + params.BaseHero)
+	err = tx.Delete(BASE_HERO_PREFIX + params.SessionId + "_" + params.PlayerId + "_" + params.BaseHero)
+	if err != nil {
+		return err
+	}
+	return tx.Delete(BASE_HERO_INITIAL_PREFIX + params.SessionId + "_" + params.PlayerId + "_" + params.BaseHero)
 }
 
 func NewHeroRepository(

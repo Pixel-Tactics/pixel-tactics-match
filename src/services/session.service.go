@@ -200,8 +200,16 @@ func (service *SessionServiceImpl) StartBattle(tx databases.BadgerTx, session *m
 		return exceptions.ExceededDeadlineError()
 	}
 
-	player1 := service.PlayerService.GetPlayer(tx, session.PlayerIds[0], session.Id)
-	player2 := service.PlayerService.GetPlayer(tx, session.PlayerIds[1], session.Id)
+	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
+	player1, err := service.PlayerService.GetPlayer(tx, session.PlayerIds[0], session.Id)
+	if err != nil {
+		return err
+	}
+	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
+	player2, err := service.PlayerService.GetPlayer(tx, session.PlayerIds[1], session.Id)
+	if err != nil {
+		return err
+	}
 
 	// TODO: check if empty = error
 	heroList1, err1 := service.HeroService.GetPlayerHeroes(tx, session.Id, player1.Id)
@@ -244,6 +252,66 @@ func (service *SessionServiceImpl) StartBattle(tx databases.BadgerTx, session *m
 		return err
 	}
 
+	_, err = service.SessionRepository.SaveInitialSession(tx, session)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (service *SessionServiceImpl) ReconstructSession(sessionId string) error {
+	tx := service.TransactionManager.NewReadWriteTransaction()
+	defer tx.Discard()
+
+	session, err := service.SessionRepository.GetInitialSession(tx, sessionId)
+	if err != nil {
+		return err
+	}
+
+	heroList1, err := service.HeroService.GetPlayerHeroes(tx, sessionId, session.PlayerIds[0])
+	if err != nil {
+		return err
+	}
+	heroList2, err := service.HeroService.GetPlayerHeroes(tx, sessionId, session.PlayerIds[1])
+	if err != nil {
+		return err
+	}
+	heroList1, heroList2, err = service.HeroService.GetInitialState(tx, heroList1, heroList2)
+	if err != nil {
+		return err
+	}
+
+	sessionMap, err := service.MapService.GetInitialState(tx, sessionId)
+	if err != nil {
+		return err
+	}
+
+	// Logic For Iterating Event Source
+
+	err = service.MapService.SetMap(tx, sessionMap)
+	if err != nil {
+		return err
+	}
+
+	err = service.HeroService.SetHeroes(tx, heroList1)
+	if err != nil {
+		return err
+	}
+	err = service.HeroService.SetHeroes(tx, heroList2)
+	if err != nil {
+		return err
+	}
+
+	_, err = service.SessionRepository.SaveSession(tx, session)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

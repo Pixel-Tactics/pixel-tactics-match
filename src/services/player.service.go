@@ -11,7 +11,7 @@ import (
 )
 
 type PlayerService interface {
-	GetPlayer(tx databases.BadgerTx, playerId string, sessionId string) *models.Player
+	GetPlayer(tx databases.BadgerTx, playerId string, sessionId string) (*models.Player, error)
 	CreatePlayerForSession(tx databases.BadgerTx, sessionId string, playerId1 string, playerId2 string) error
 	SetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string, heroList []heroes.BaseHeroEnum) error
 
@@ -24,7 +24,7 @@ type PlayerServiceImpl struct {
 	SessionService SessionService
 }
 
-func (service *PlayerServiceImpl) GetPlayer(tx databases.BadgerTx, playerId string, sessionId string) *models.Player {
+func (service *PlayerServiceImpl) GetPlayer(tx databases.BadgerTx, playerId string, sessionId string) (*models.Player, error) {
 	return service.PlayerRepository.GetPlayerByIdAndSessionId(tx, playerId, sessionId)
 }
 
@@ -40,7 +40,7 @@ func (service *PlayerServiceImpl) CreatePlayerForSession(tx databases.BadgerTx, 
 
 	// TODO: check if player really exists as multilayer protection
 
-	_, err = service.PlayerRepository.CreatePlayer(tx, repositories.CreatePlayerParams{
+	_, err = service.PlayerRepository.SavePlayer(tx, &models.Player{
 		Id:        playerId1,
 		SessionId: sessionId,
 	})
@@ -48,7 +48,7 @@ func (service *PlayerServiceImpl) CreatePlayerForSession(tx databases.BadgerTx, 
 		return err
 	}
 
-	_, err = service.PlayerRepository.CreatePlayer(tx, repositories.CreatePlayerParams{
+	_, err = service.PlayerRepository.SavePlayer(tx, &models.Player{
 		Id:        playerId2,
 		SessionId: sessionId,
 	})
@@ -61,17 +61,17 @@ func (service *PlayerServiceImpl) CreatePlayerForSession(tx databases.BadgerTx, 
 }
 
 func (service *PlayerServiceImpl) SetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string, heroList []heroes.BaseHeroEnum) error {
-	player := service.GetPlayer(tx, playerId, sessionId)
+	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
+	player, err := service.GetPlayer(tx, playerId, sessionId)
+	if err != nil {
+		return err
+	}
 	if player == nil {
 		return errors.New("invalid player key")
 	}
 
-	_, err := service.PlayerRepository.UpdatePlayer(tx, repositories.UpdatePlayerParams{
-		SessionId: sessionId,
-		PlayerId:  playerId,
-		HeroBases: heroList,
-	})
-
+	player.HeroBases = heroList
+	_, err = service.PlayerRepository.SavePlayer(tx, player)
 	return err
 }
 

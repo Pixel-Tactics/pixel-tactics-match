@@ -30,6 +30,7 @@ type MapService interface {
 	IsPointOpen(tx databases.BadgerTx, session *models.Session, pos physics.Point) (bool, error)
 
 	SetHeroService(heroService HeroService)
+	SetMap(tx databases.BadgerTx, newMap *models.Map) error
 }
 
 type MapServiceImpl struct {
@@ -89,6 +90,11 @@ func (service *MapServiceImpl) GetInitialState(tx databases.BadgerTx, sessionId 
 		SessionId: sessionId,
 		Structure: getMapTemplate(),
 	}, nil
+}
+
+func (service *MapServiceImpl) SetMap(tx databases.BadgerTx, newMap *models.Map) error {
+	_, err := service.MapRepository.SaveMap(tx, newMap)
+	return err
 }
 
 func (service *MapServiceImpl) SetHeroService(heroService HeroService) {

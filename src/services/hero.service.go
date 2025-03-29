@@ -32,6 +32,7 @@ type HeroService interface {
 
 	SetSessionService(sessionService SessionService)
 	SetPlayerService(playerService PlayerService)
+	SetHeroes(tx databases.BadgerTx, heroList []*models.Hero) error
 }
 
 type HeroServiceImpl struct {
@@ -60,7 +61,11 @@ type MoveEvent struct {
 }
 
 func (service *HeroServiceImpl) GetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string) ([]*models.Hero, error) {
-	player := service.PlayerService.GetPlayer(tx, sessionId, playerId)
+	// TODO: check whether not assigned returns error too or nil.. if error, which error
+	player, err := service.PlayerService.GetPlayer(tx, sessionId, playerId)
+	if err != nil {
+		return nil, err
+	}
 	if player == nil {
 		return nil, errors.New("invalid player")
 	}
@@ -144,7 +149,7 @@ func (service *HeroServiceImpl) GetAvailableHeroes() []heroes.BaseHeroEnum {
 }
 
 func (service *HeroServiceImpl) CreateHeroesTx(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error {
-	// TODO: check whether not assigned returns error too or nil.. if error, which error (repo)
+	// TODO: check whether not assigned returns error too or nil.. if error, which error
 	session, err := service.SessionService.GetSessionById(tx, sessionId)
 	if err != nil {
 		return err
@@ -286,25 +291,14 @@ func (service *HeroServiceImpl) GetInitialState(
 		initList2 = append(initList2, obj)
 	}
 	return initList1, initList2, nil
-	// heroList := heroList1
-	// heroList = append(heroList, heroList2...)
+}
 
-	// for i, hero := range heroList {
-	// 	if i < len(heroList1) {
-	// 		_, err := service.HeroRepository.GetInitialHero(tx, hero.SessionId, hero.PlayerId, hero.BaseHero)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		_, err = service.HeroRepository.SaveHero(tx, hero)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 	} else {
-	// 		break
-	// 	}
-	// }
-
-	// return nil
+func (service *HeroServiceImpl) SetHeroes(tx databases.BadgerTx, heroList []*models.Hero) error {
+	_, err := service.HeroRepository.SaveHeroes(tx, heroList)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (service *HeroServiceImpl) isChosenHeroesValid(available []heroes.BaseHeroEnum, chosen []heroes.BaseHeroEnum) bool {

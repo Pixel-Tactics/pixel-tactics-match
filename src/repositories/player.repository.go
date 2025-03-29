@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"pixeltactics.com/match/src/databases"
-	"pixeltactics.com/match/src/heroes"
 	"pixeltactics.com/match/src/models"
 )
 
@@ -14,70 +13,82 @@ const (
 )
 
 type PlayerRepository interface {
-	GetPlayerByIdAndSessionId(tx databases.BadgerTx, playerId string, sessionId string) *models.Player
-	CreatePlayer(tx databases.BadgerTx, params CreatePlayerParams) (*models.Player, error)
-	UpdatePlayer(tx databases.BadgerTx, params UpdatePlayerParams) (*models.Player, error)
+	GetPlayerByIdAndSessionId(tx databases.BadgerTx, playerId string, sessionId string) (*models.Player, error)
+	SavePlayer(tx databases.BadgerTx, obj *models.Player) (*models.Player, error)
+	// CreatePlayer(tx databases.BadgerTx, params CreatePlayerParams) (*models.Player, error)
+	// UpdatePlayer(tx databases.BadgerTx, params UpdatePlayerParams) (*models.Player, error)
 	DeletePlayer(tx databases.BadgerTx, playerId string, sessionId string) error
 }
 
-type CreatePlayerParams struct {
-	Id        string
-	SessionId string
-}
+// type CreatePlayerParams struct {
+// 	Id        string
+// 	SessionId string
+// }
 
-type UpdatePlayerParams struct {
-	SessionId string
-	PlayerId  string
-	HeroBases []heroes.BaseHeroEnum
-}
+// type UpdatePlayerParams struct {
+// 	SessionId string
+// 	PlayerId  string
+// 	HeroBases []heroes.BaseHeroEnum
+// }
 
 type PlayerRepositoryImpl struct {
 	badger databases.Badger
 }
 
-func (repo *PlayerRepositoryImpl) GetPlayerByIdAndSessionId(tx databases.BadgerTx, playerId string, sessionId string) *models.Player {
+// TODO: check behavior when unset, error or null
+func (repo *PlayerRepositoryImpl) GetPlayerByIdAndSessionId(tx databases.BadgerTx, playerId string, sessionId string) (*models.Player, error) {
 	query := databases.GetQuery(tx, repo.badger)
 
 	var player models.Player
 	err := query.Get(PLAYERID_SESSIONID_TO_PLAYER+sessionId+"_"+playerId, &player)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return &player
+	return &player, nil
 }
 
-func (repo *PlayerRepositoryImpl) CreatePlayer(tx databases.BadgerTx, params CreatePlayerParams) (*models.Player, error) {
+func (repo *PlayerRepositoryImpl) SavePlayer(tx databases.BadgerTx, obj *models.Player) (*models.Player, error) {
 	query := databases.GetQuery(tx, repo.badger)
 
-	player := &models.Player{
-		Id:        params.Id,
-		SessionId: params.SessionId,
-	}
-	err := query.Set(PLAYERID_SESSIONID_TO_PLAYER+params.SessionId+"_"+params.Id, player)
+	err := query.Set(PLAYERID_SESSIONID_TO_PLAYER+obj.SessionId+"_"+obj.Id, obj)
 	if err != nil {
 		return nil, err
 	}
-	return player, nil
+	return obj, nil
 }
 
-func (repo *PlayerRepositoryImpl) UpdatePlayer(tx databases.BadgerTx, params UpdatePlayerParams) (*models.Player, error) {
-	if tx == nil {
-		return nil, errors.New("transaction object is null")
-	}
+// func (repo *PlayerRepositoryImpl) CreatePlayer(tx databases.BadgerTx, params CreatePlayerParams) (*models.Player, error) {
+// 	query := databases.GetQuery(tx, repo.badger)
 
-	player := repo.GetPlayerByIdAndSessionId(tx, params.PlayerId, params.SessionId)
-	if player == nil {
-		return nil, errors.New("invalid player key")
-	}
+// 	player := &models.Player{
+// 		Id:        params.Id,
+// 		SessionId: params.SessionId,
+// 	}
+// 	err := query.Set(PLAYERID_SESSIONID_TO_PLAYER+params.SessionId+"_"+params.Id, player)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return player, nil
+// }
 
-	player.HeroBases = params.HeroBases
+// func (repo *PlayerRepositoryImpl) UpdatePlayer(tx databases.BadgerTx, params UpdatePlayerParams) (*models.Player, error) {
+// 	if tx == nil {
+// 		return nil, errors.New("transaction object is null")
+// 	}
 
-	err := tx.Set(PLAYERID_SESSIONID_TO_PLAYER+params.SessionId+"_"+params.PlayerId, player)
-	if err != nil {
-		return nil, err
-	}
-	return player, nil
-}
+// 	player := repo.GetPlayerByIdAndSessionId(tx, params.PlayerId, params.SessionId)
+// 	if player == nil {
+// 		return nil, errors.New("invalid player key")
+// 	}
+
+// 	player.HeroBases = params.HeroBases
+
+// 	err := tx.Set(PLAYERID_SESSIONID_TO_PLAYER+params.SessionId+"_"+params.PlayerId, player)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return player, nil
+// }
 
 func (repo *PlayerRepositoryImpl) DeletePlayer(tx databases.BadgerTx, playerId string, sessionId string) error {
 	if tx == nil {
