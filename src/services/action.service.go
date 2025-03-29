@@ -79,10 +79,11 @@ func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHe
 		return err
 	}
 
-	err = service.eventManager.Emit("move", map[string]interface{}{
-		"tx":    tx,
-		"hero":  srcHero,
-		"point": curPos,
+	err = service.eventManager.Emit("MOVE", &MoveEvent{
+		Tx:          tx,
+		SrcHero:     srcHero,
+		Position:    curPos,
+		CurrentTurn: session.CurrentTurn,
 	})
 	if err != nil {
 		return err
@@ -148,7 +149,7 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 	}
 
 	_, err = service.sessionLogRepository.AppendLog(tx, sessionId, &models.SessionLog{
-		Type: "ATTACK",
+		Type: "DAMAGE",
 		Data: map[string]interface{}{
 			"playerId":    playerId,
 			"srcBaseHero": srcBaseHero,
@@ -165,11 +166,12 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 	// 	return err
 	// }
 
-	err = service.eventManager.Emit("move", map[string]interface{}{
-		"tx":      tx,
-		"srcHero": srcHero,
-		"dstHero": dstHero,
-		"damage":  damage,
+	err = service.eventManager.Emit("DAMAGE", &AttackEvent{
+		Tx:          tx,
+		SrcHero:     srcHero,
+		DstHero:     dstHero,
+		Damage:      damage,
+		CurrentTurn: session.CurrentTurn,
 	})
 	if err != nil {
 		return err

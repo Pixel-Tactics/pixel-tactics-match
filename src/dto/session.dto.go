@@ -19,7 +19,7 @@ type GetSessionResponse struct {
 }
 
 type PreparePlayerRequest struct {
-	PlayerId       string   `json:"playerId"`
+	// PlayerId       string   `json:"playerId"`
 	ChosenHeroList []string `json:"chosenHeroList"`
 }
 

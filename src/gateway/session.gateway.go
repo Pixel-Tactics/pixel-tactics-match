@@ -146,6 +146,11 @@ func (gateway *SessionGatewayImpl) CreateSession(client *messages.WebSocketMessa
 }
 
 func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessager) {
+	if client.ClientId == nil {
+		client.SendBack(Error(errors.New("not authenticated")))
+		return
+	}
+
 	var body dto.PreparePlayerRequest
 	err := convert_utils.MapToObject(client.Message.Body, &body)
 	if err != nil {
@@ -160,18 +165,19 @@ func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessa
 		return
 	}
 
-	_, err = gateway.SessionService.PreparePlayer(body.PlayerId, body.ChosenHeroList)
-	if err != nil {
-		client.SendBack(Error(err))
-		return
-	}
+	// TODO: was doing
+	// isStarted, err := gateway.SessionService.PreparePlayer(*client.ClientId, body.ChosenHeroList)
+	// if err != nil {
+	// 	client.SendBack(Error(err))
+	// 	return
+	// }
 
-	client.SendBack(&messages.Message{
-		Type: client.Message.Type,
-		Body: map[string]interface{}{
-			"success": true,
-		},
-	})
+	// client.SendBack(&messages.Message{
+	// 	Type: client.Message.Type,
+	// 	Body: map[string]interface{}{
+	// 		"success": true,
+	// 	},
+	// })
 }
 
 // func (gateway *SessionGatewayImpl) ExecuteAction(client *messages.WebSocketMessager) {

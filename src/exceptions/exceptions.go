@@ -23,7 +23,7 @@ func ExceededDeadlineError() error {
 }
 
 func HeroPickupError() error {
-	return errors.New("player didn't pickup hero")
+	return errors.New("player didn't pickup valid heroes")
 }
 
 func HeroIsDead() error {

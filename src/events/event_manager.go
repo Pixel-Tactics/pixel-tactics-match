@@ -3,20 +3,20 @@ package events
 import "errors"
 
 type EventManager interface {
-	Emit(key string, value map[string]interface{}) error
-	On(key string, foo func(map[string]interface{}) error)
+	Emit(key string, value interface{}) error
+	On(key string, foo func(interface{}) error)
 }
 
 type SequentialEventManager struct {
-	Subscribers map[string][]func(map[string]interface{}) error
+	Subscribers map[string][]func(interface{}) error
 }
 
 type Event struct {
 	Key   string
-	Value map[string]interface{}
+	Value interface{}
 }
 
-func (manager *SequentialEventManager) Emit(key string, value map[string]interface{}) error {
+func (manager *SequentialEventManager) Emit(key string, value interface{}) error {
 	subscribers, ok := manager.Subscribers[key]
 	if !ok {
 		return nil
@@ -35,10 +35,10 @@ func (manager *SequentialEventManager) Emit(key string, value map[string]interfa
 	}
 }
 
-func (manager *SequentialEventManager) On(key string, foo func(map[string]interface{}) error) {
+func (manager *SequentialEventManager) On(key string, foo func(interface{}) error) {
 	subscribers, ok := manager.Subscribers[key]
 	if !ok {
-		subscribers = make([]func(map[string]interface{}) error, 0)
+		subscribers = make([]func(interface{}) error, 0)
 	}
 	subscribers = append(subscribers, foo)
 	manager.Subscribers[key] = subscribers
@@ -46,6 +46,12 @@ func (manager *SequentialEventManager) On(key string, foo func(map[string]interf
 
 func (manager *SequentialEventManager) Run() error {
 	panic("Invalid method")
+}
+
+func NewSequentialEventManager() *SequentialEventManager {
+	return &SequentialEventManager{
+		Subscribers: make(map[string][]func(interface{}) error),
+	}
 }
 
 // type EventManagerImpl struct {

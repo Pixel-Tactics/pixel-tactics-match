@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"pixeltactics.com/match/src/databases"
+	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/exceptions"
 	"pixeltactics.com/match/src/heroes"
 	"pixeltactics.com/match/src/models"
@@ -39,6 +40,22 @@ type HeroServiceImpl struct {
 
 	HeroFactory        heroes.BaseHeroFactory
 	TransactionManager databases.TransactionManager
+	EventManager       events.EventManager
+}
+
+type AttackEvent struct {
+	Tx          databases.BadgerTx
+	CurrentTurn int
+	SrcHero     *models.Hero
+	DstHero     *models.Hero
+	Damage      int
+}
+
+type MoveEvent struct {
+	Tx          databases.BadgerTx
+	CurrentTurn int
+	SrcHero     *models.Hero
+	Position    physics.Point
 }
 
 func (service *HeroServiceImpl) GetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string) ([]*models.Hero, error) {
@@ -75,6 +92,20 @@ func (service *HeroServiceImpl) MoveHero(tx databases.BadgerTx, currentTurn int,
 	return nil
 }
 
+func (service *HeroServiceImpl) onMove(data interface{}) error {
+	moveData, ok := data.(*MoveEvent)
+	if !ok {
+		return errors.New("invalid data")
+	}
+
+	err := service.MoveHero(moveData.Tx, moveData.CurrentTurn, moveData.SrcHero, moveData.Position)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (service *HeroServiceImpl) ApplyDamage(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, trgHero *models.Hero, damage int) error {
 	srcHero.LastAttackTurn = currentTurn
 	trgHero.Health = max(trgHero.Health-damage, 0)
@@ -84,6 +115,20 @@ func (service *HeroServiceImpl) ApplyDamage(tx databases.BadgerTx, currentTurn i
 		return err
 	}
 	_, err = service.HeroRepository.SaveHero(tx, trgHero)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (service *HeroServiceImpl) onDamage(data interface{}) error {
+	attackData, ok := data.(*AttackEvent)
+	if !ok {
+		return errors.New("invalid data")
+	}
+
+	err := service.ApplyDamage(attackData.Tx, attackData.CurrentTurn, attackData.SrcHero, attackData.DstHero, attackData.Damage)
 	if err != nil {
 		return err
 	}
@@ -251,12 +296,17 @@ func NewHeroService(
 	playerService PlayerService,
 	heroFactory heroes.BaseHeroFactory,
 	transactionManager databases.TransactionManager,
+	eventManager events.EventManager,
 ) HeroService {
-	return &HeroServiceImpl{
+	heroService := &HeroServiceImpl{
 		HeroRepository:     heroRepository,
 		SessionService:     sessionService,
 		PlayerService:      playerService,
 		HeroFactory:        heroFactory,
 		TransactionManager: transactionManager,
+		EventManager:       eventManager,
 	}
+	eventManager.On("MOVE", heroService.onMove)
+	eventManager.On("DAMAGE", heroService.onDamage)
+	return heroService
 }

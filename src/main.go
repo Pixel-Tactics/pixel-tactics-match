@@ -7,6 +7,7 @@ import (
 	"pixeltactics.com/match/src/config"
 	"pixeltactics.com/match/src/core/states"
 	"pixeltactics.com/match/src/databases"
+	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/gateway"
 	"pixeltactics.com/match/src/heroes"
 	"pixeltactics.com/match/src/repositories"
@@ -32,6 +33,7 @@ func main() {
 
 	heroFactory := heroes.NewBaseHeroFactory()
 	stateFactory := states.NewSessionStateFactory()
+	eventManager := events.NewSequentialEventManager()
 
 	mapRepo := repositories.NewMapRepository(badger)
 	heroRepo := repositories.NewHeroRepository(badger)
@@ -40,7 +42,7 @@ func main() {
 
 	authService := services.NewAuthService()
 	mapService := services.NewMapService(mapRepo, nil)
-	heroService := services.NewHeroService(heroRepo, nil, nil, heroFactory, badger)
+	heroService := services.NewHeroService(heroRepo, nil, nil, heroFactory, badger, eventManager)
 	playerService := services.NewPlayerService(playerRepo, nil)
 	sessionService := services.NewSessionService(mapService, heroService, playerService, sessionRepo, stateFactory, badger)
 
