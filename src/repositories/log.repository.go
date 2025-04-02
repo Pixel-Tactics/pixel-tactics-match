@@ -15,12 +15,25 @@ const (
 )
 
 type SessionLogRepository interface {
+	CountSessionLogs(tx databases.BadgerTx, sessionId string) (int, error)
 	GetSessionLogs(tx databases.BadgerTx, sessionId string) ([]*models.SessionLog, error)
 	AppendLog(tx databases.BadgerTx, sessionId string, obj *models.SessionLog) (*models.SessionLog, error)
 }
 
 type SessionLogRepositoryImpl struct {
 	badger databases.Badger
+}
+
+func (repo *SessionLogRepositoryImpl) CountSessionLogs(tx databases.BadgerTx, sessionId string) (int, error) {
+	query := databases.GetQuery(tx, repo.badger)
+
+	var logCount int
+	err := query.Get(LOG_COUNT+sessionId, &logCount)
+	if err != nil {
+		return 0, err
+	}
+
+	return logCount, nil
 }
 
 func (repo *SessionLogRepositoryImpl) GetSessionLogs(tx databases.BadgerTx, sessionId string) ([]*models.SessionLog, error) {

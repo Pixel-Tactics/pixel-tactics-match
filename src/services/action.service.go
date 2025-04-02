@@ -7,6 +7,7 @@ import (
 	"pixeltactics.com/match/src/models"
 	"pixeltactics.com/match/src/repositories"
 	"pixeltactics.com/match/src/utils/algorithms"
+	convert_utils "pixeltactics.com/match/src/utils/convert"
 	"pixeltactics.com/match/src/utils/physics"
 )
 
@@ -22,14 +23,22 @@ type ActionServiceImpl struct {
 
 	sessionLogRepository repositories.SessionLogRepository
 	transactionManager   databases.TransactionManager
-	// eventManager         events.EventManager
+}
+
+type MoveSessionLog struct {
+	PlayerId string
+	BaseHero string
+	Point    physics.Point
+}
+
+func (service *ActionServiceImpl) ApplyMoveLog(log MoveSessionLog, currentTurn int, srcHero *models.Hero) {
+	srcHero.MovePosition(currentTurn, log.Point)
 }
 
 func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHero string, directions []physics.Direction) error {
 	tx := service.transactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
 
-	// TODO: check whether not assigned returns error too or nil.. if error, which error
 	session, err := service.sessionService.GetSessionById(tx, sessionId)
 	if err != nil {
 		return err
@@ -73,13 +82,18 @@ func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHe
 		}
 	}
 
+	logObj, err := convert_utils.ObjectToMap(&MoveSessionLog{
+		PlayerId: playerId,
+		BaseHero: baseHero,
+		Point:    curPos,
+	})
+	if err != nil {
+		return err
+	}
+
 	_, err = service.sessionLogRepository.AppendLog(tx, sessionId, &models.SessionLog{
 		Type: "MOVE",
-		Data: map[string]interface{}{
-			"playerId": playerId,
-			"baseHero": baseHero,
-			"point":    curPos,
-		},
+		Data: logObj,
 	})
 	if err != nil {
 		return err
@@ -90,16 +104,6 @@ func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHe
 		return err
 	}
 
-	// err = service.eventManager.Emit("MOVE", &MoveEvent{
-	// 	Tx:          tx,
-	// 	SrcHero:     srcHero,
-	// 	Position:    curPos,
-	// 	CurrentTurn: session.CurrentTurn,
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-
 	err = tx.Commit()
 	if err != nil {
 		return err
@@ -107,11 +111,22 @@ func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHe
 	return nil
 }
 
+func (service *ActionServiceImpl) ApplyAttackLog(log AttackSessionLog, currentTurn int, srcHero *models.Hero, dstHero *models.Hero) {
+	srcHero.Attack(currentTurn)
+	dstHero.Damage(log.Damage)
+}
+
+type AttackSessionLog struct {
+	PlayerId    string
+	SrcBaseHero string
+	DstBaseHero string
+	Damage      int
+}
+
 func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcBaseHero string, dstBaseHero string) error {
 	tx := service.transactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
 
-	// TODO: check whether not assigned returns error too or nil.. if error, which error
 	session, err := service.sessionService.GetSessionById(tx, sessionId)
 	if err != nil {
 		return err
@@ -161,14 +176,19 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 		return errors.New("target out of range")
 	}
 
+	logObj, err := convert_utils.ObjectToMap(&AttackSessionLog{
+		PlayerId:    playerId,
+		SrcBaseHero: srcBaseHero,
+		DstBaseHero: dstBaseHero,
+		Damage:      damage,
+	})
+	if err != nil {
+		return err
+	}
+
 	_, err = service.sessionLogRepository.AppendLog(tx, sessionId, &models.SessionLog{
 		Type: "DAMAGE",
-		Data: map[string]interface{}{
-			"playerId":    playerId,
-			"srcBaseHero": srcBaseHero,
-			"dstBaseHero": dstBaseHero,
-			"damage":      damage,
-		},
+		Data: logObj,
 	})
 	if err != nil {
 		return err
@@ -178,17 +198,6 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 	if err != nil {
 		return err
 	}
-
-	// err = service.eventManager.Emit("DAMAGE", &AttackEvent{
-	// 	Tx:          tx,
-	// 	SrcHero:     srcHero,
-	// 	DstHero:     dstHero,
-	// 	Damage:      damage,
-	// 	CurrentTurn: session.CurrentTurn,
-	// })
-	// if err != nil {
-	// 	return err
-	// }
 
 	err = tx.Commit()
 	if err != nil {
