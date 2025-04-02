@@ -5,22 +5,24 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/exceptions"
 	"pixeltactics.com/match/src/models"
 )
 
 type MatchmakingState struct {
-	session *models.Session
+	Session      *models.Session
+	EventManager events.EventManager
 }
 
 func (state *MatchmakingState) Start(deadline time.Time) error {
 	log.Println("SETTING TO PREPARATION")
-	state.session.State = models.State{
+	state.Session.State = models.State{
 		Id:       uuid.New().String(),
 		Type:     models.SessionStatePreparation,
 		Deadline: deadline,
 	}
-	return nil
+	return sendStateUpdateEvent(state.EventManager, state.Session.Id, state.Session.State)
 }
 
 func (state *MatchmakingState) Swap(deadline time.Time) error {
@@ -31,8 +33,9 @@ func (state *MatchmakingState) End(winnerId *string) error {
 	return exceptions.ActionNotAllowed()
 }
 
-func NewMatchmakingState(session *models.Session) *MatchmakingState {
+func NewMatchmakingState(session *models.Session, eventManager events.EventManager) *MatchmakingState {
 	return &MatchmakingState{
-		session: session,
+		Session:      session,
+		EventManager: eventManager,
 	}
 }

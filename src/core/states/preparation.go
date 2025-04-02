@@ -4,21 +4,23 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/exceptions"
 	"pixeltactics.com/match/src/models"
 )
 
 type PreparationState struct {
-	session *models.Session
+	Session      *models.Session
+	EventManager events.EventManager
 }
 
 func (state *PreparationState) Start(deadline time.Time) error {
-	state.session.State = models.State{
+	state.Session.State = models.State{
 		Id:       uuid.New().String(),
 		Type:     models.SessionStatePlayer1Turn,
 		Deadline: deadline,
 	}
-	return nil
+	return sendStateUpdateEvent(state.EventManager, state.Session.Id, state.Session.State)
 }
 
 func (state *PreparationState) Swap(deadline time.Time) error {
@@ -26,16 +28,17 @@ func (state *PreparationState) Swap(deadline time.Time) error {
 }
 
 func (state *PreparationState) End(winnerId *string) error {
-	state.session.WinnerId = winnerId
-	state.session.State = models.State{
+	state.Session.WinnerId = winnerId
+	state.Session.State = models.State{
 		Id:   uuid.New().String(),
 		Type: models.SessionStateEnded,
 	}
-	return nil
+	return sendStateUpdateEvent(state.EventManager, state.Session.Id, state.Session.State)
 }
 
-func NewPreparationState(session *models.Session) *PreparationState {
+func NewPreparationState(session *models.Session, eventManager events.EventManager) *PreparationState {
 	return &PreparationState{
-		session: session,
+		Session:      session,
+		EventManager: eventManager,
 	}
 }
