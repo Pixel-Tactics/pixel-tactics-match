@@ -22,9 +22,15 @@ const (
 )
 
 type SessionService interface {
+	// When no key found (or empty) for session, nil session will be returned instead of error.
 	GetSessionById(tx databases.BadgerTx, sessionId string) (*models.Session, error)
+
+	// When no key found (or empty) for session, nil session will be returned instead of error.
 	GetSessionByPlayerId(playerId string) (*models.Session, error)
+
+	// When no key found (or empty) for session, nil session will be returned instead of error.
 	CreateSession(playerId string, opponentId string) (*models.Session, error)
+
 	PreparePlayer(playerId string, chosenHeroes []heroes.BaseHeroEnum) (bool, error)
 	CompileSession(sessionId string) (map[string]interface{}, error)
 }
@@ -39,18 +45,18 @@ type SessionServiceImpl struct {
 	TransactionManager databases.TransactionManager
 }
 
+// When no key found (or empty) for session, nil session will be returned instead of error.
 func (service *SessionServiceImpl) GetSessionById(tx databases.BadgerTx, sessionId string) (*models.Session, error) {
-	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 	return service.SessionRepository.GetSessionById(tx, sessionId)
 }
 
+// When no key found (or empty) for session, nil session will be returned instead of error.
 func (service *SessionServiceImpl) GetSessionByPlayerIdTx(tx databases.BadgerTx, playerId string) (*models.Session, error) {
-	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 	return service.SessionRepository.GetSessionByPlayerId(tx, playerId)
 }
 
+// When no key found (or empty) for session, nil session will be returned instead of error.
 func (service *SessionServiceImpl) GetSessionByPlayerId(playerId string) (*models.Session, error) {
-	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 	return service.SessionRepository.GetSessionByPlayerId(nil, playerId)
 }
 
@@ -71,7 +77,6 @@ func (service *SessionServiceImpl) CreateSession(playerId string, opponentId str
 	// Session object is already created (by opponent)
 	if isStart {
 		log.Println("STARTING...")
-		// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 		oppSession, err := service.SessionRepository.GetSessionByPlayerId(tx, opponentId)
 		if err != nil {
 			log.Fatalln(err)
@@ -155,7 +160,6 @@ func (service *SessionServiceImpl) PreparePlayer(playerId string, chosenHeroes [
 	tx := service.TransactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
 
-	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 	session, err := service.SessionRepository.GetSessionByPlayerId(tx, playerId)
 	if err != nil {
 		return false, err
@@ -168,7 +172,7 @@ func (service *SessionServiceImpl) PreparePlayer(playerId string, chosenHeroes [
 		return false, exceptions.ExceededDeadlineError()
 	}
 
-	err = service.HeroService.CreateHeroesTx(tx, session.Id, playerId, chosenHeroes)
+	err = service.HeroService.CreateHeroes(tx, session.Id, playerId, chosenHeroes)
 	if err != nil {
 		return false, err
 	}
@@ -200,18 +204,21 @@ func (service *SessionServiceImpl) StartBattle(tx databases.BadgerTx, session *m
 		return exceptions.ExceededDeadlineError()
 	}
 
-	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 	player1, err := service.PlayerService.GetPlayer(tx, session.PlayerIds[0], session.Id)
 	if err != nil {
 		return err
 	}
-	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
+	if player1 == nil {
+		return errors.New("invalid player 1")
+	}
 	player2, err := service.PlayerService.GetPlayer(tx, session.PlayerIds[1], session.Id)
 	if err != nil {
 		return err
 	}
+	if player2 == nil {
+		return errors.New("invalid player 1")
+	}
 
-	// TODO: check if empty = error
 	heroList1, err1 := service.HeroService.GetPlayerHeroes(tx, session.Id, player1.Id)
 	heroList2, err2 := service.HeroService.GetPlayerHeroes(tx, session.Id, player2.Id)
 	if err1 != nil || err2 != nil {
@@ -260,61 +267,6 @@ func (service *SessionServiceImpl) StartBattle(tx databases.BadgerTx, session *m
 	return nil
 }
 
-func (service *SessionServiceImpl) ReconstructSession(sessionId string) error {
-	tx := service.TransactionManager.NewReadWriteTransaction()
-	defer tx.Discard()
-
-	session, err := service.SessionRepository.GetInitialSession(tx, sessionId)
-	if err != nil {
-		return err
-	}
-
-	heroList1, err := service.HeroService.GetPlayerHeroes(tx, sessionId, session.PlayerIds[0])
-	if err != nil {
-		return err
-	}
-	heroList2, err := service.HeroService.GetPlayerHeroes(tx, sessionId, session.PlayerIds[1])
-	if err != nil {
-		return err
-	}
-	heroList1, heroList2, err = service.HeroService.GetInitialState(tx, heroList1, heroList2)
-	if err != nil {
-		return err
-	}
-
-	sessionMap, err := service.MapService.GetInitialState(tx, sessionId)
-	if err != nil {
-		return err
-	}
-
-	// Logic For Iterating Event Source
-
-	err = service.MapService.SetMap(tx, sessionMap)
-	if err != nil {
-		return err
-	}
-
-	err = service.HeroService.SetHeroes(tx, heroList1)
-	if err != nil {
-		return err
-	}
-	err = service.HeroService.SetHeroes(tx, heroList2)
-	if err != nil {
-		return err
-	}
-
-	_, err = service.SessionRepository.SaveSession(tx, session)
-	if err != nil {
-		return err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (service *SessionServiceImpl) checkForExpire(tx databases.BadgerTx, session *models.Session, lastStateId string) error {
 	if session.State.Id != lastStateId {
 		return nil
@@ -333,7 +285,6 @@ func (service *SessionServiceImpl) checkForExpire(tx databases.BadgerTx, session
 }
 
 func (service *SessionServiceImpl) checkPlayerSession(tx databases.BadgerTx, playerId string) error {
-	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 	plrSession, err := service.SessionRepository.GetSessionByPlayerId(tx, playerId)
 	if err != nil {
 		return err
@@ -345,12 +296,10 @@ func (service *SessionServiceImpl) checkPlayerSession(tx databases.BadgerTx, pla
 }
 
 func (service *SessionServiceImpl) checkOpponentSession(tx databases.BadgerTx, playerId string, opponentId string) (bool, error) {
-	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 	oppSession, err := service.SessionRepository.GetSessionByPlayerId(tx, opponentId)
 	if err != nil {
 		return false, err
 	}
-	log.Println(oppSession)
 	if oppSession != nil {
 		if oppSession.IsRunning() {
 			return false, errors.New("opponent is in running session")
@@ -369,10 +318,12 @@ func (service *SessionServiceImpl) CompileSession(sessionId string) (map[string]
 	// 	actionData["order"] = i
 	// 	actionLogData = append(actionLogData, actionData)
 	// }
-	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 	session, err := service.GetSessionById(nil, sessionId)
 	if err != nil {
 		return nil, err
+	}
+	if session == nil {
+		return nil, errors.New("session not found")
 	}
 	state, err := convert_utils.ObjectToMap(session.State)
 	if err != nil {

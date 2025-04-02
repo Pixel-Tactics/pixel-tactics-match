@@ -14,15 +14,14 @@ const (
 )
 
 type HeroRepository interface {
+	// When no key found (or empty) for heroes, or somehow atleast one hero is not found, error will be returned.
 	GetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string, bases []heroes.BaseHeroEnum) ([]*models.Hero, error)
+	// When no key found (or empty) for hero, nil hero will be returned instead of error.
 	GetHeroBySessionId(tx databases.BadgerTx, params HeroKey) (*models.Hero, error)
 	SaveHero(tx databases.BadgerTx, params *models.Hero) (*models.Hero, error)
 	SaveHeroes(tx databases.BadgerTx, heroList []*models.Hero) ([]*models.Hero, error)
 	GetInitialHero(tx databases.BadgerTx, sessionId string, playerId string, baseHero string) (*models.Hero, error)
 	SaveInitialHero(tx databases.BadgerTx, obj *models.Hero) (*models.Hero, error)
-	// UpdateHero(params UpdateHeroParams) (*models.Hero, error)
-	// BatchUpdateHero(params []UpdateHeroParams) error
-	// BatchCreateHeroes(params []CreateHeroParams) ([]*models.Hero, error)
 	DeleteHero(tx databases.BadgerTx, params HeroKey) error
 }
 
@@ -36,6 +35,7 @@ type HeroRepositoryImpl struct {
 	badger databases.Badger
 }
 
+// When no key found (or empty) for heroes, or somehow atleast one hero is not found, error will be returned.
 func (repo *HeroRepositoryImpl) GetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string, bases []heroes.BaseHeroEnum) ([]*models.Hero, error) {
 	query := databases.GetQuery(tx, repo.badger)
 
@@ -43,20 +43,26 @@ func (repo *HeroRepositoryImpl) GetPlayerHeroes(tx databases.BadgerTx, sessionId
 	for _, base := range bases {
 		var hero models.Hero
 		err := query.Get(BASE_HERO_PREFIX+sessionId+"_"+playerId+"_"+base, &hero)
-		if err != nil {
+		if err != nil && err == databases.NotFoundException() {
 			return nil, errors.New("invalid params")
+		}
+		if err != nil {
+			return nil, err
 		}
 		ret = append(ret, &hero)
 	}
 	return ret, nil
 }
 
-// TODO: check whether not assigned returns error or nil.. if error, which error
+// When no key found (or empty) for hero, nil hero will be returned instead of error.
 func (repo *HeroRepositoryImpl) GetHeroBySessionId(tx databases.BadgerTx, params HeroKey) (*models.Hero, error) {
 	query := databases.GetQuery(tx, repo.badger)
 
 	var hero models.Hero
 	err := query.Get(BASE_HERO_PREFIX+params.SessionId+"_"+params.PlayerId+"_"+params.BaseHero, &hero)
+	if err != nil && err == databases.NotFoundException() {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +98,9 @@ func (repo *HeroRepositoryImpl) GetInitialHero(tx databases.BadgerTx, sessionId 
 
 	var hero models.Hero
 	err := query.Get(BASE_HERO_INITIAL_PREFIX+sessionId+"_"+playerId+"_"+baseHero, &hero)
+	if err != nil && err == databases.NotFoundException() {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -107,81 +116,6 @@ func (repo *HeroRepositoryImpl) SaveInitialHero(tx databases.BadgerTx, obj *mode
 	}
 	return obj, nil
 }
-
-// func (repo *HeroRepositoryImpl) UpdateHero(obj *models.Hero) (*models.Hero, error) {
-// 	// hero := repo.GetHeroBySessionId(HeroKey{
-// 	// 	SessionId: obj.SessionId,
-// 	// 	PlayerId:  obj.PlayerId,
-// 	// 	BaseHero:  obj.BaseHero,
-// 	// })
-// 	// if hero == nil {
-// 	// 	return nil, errors.New("invalid hero key")
-// 	// }
-
-// 	err := repo.badger.Set(BASE_HERO_PREFIX+params.SessionId+"_"+params.PlayerId+"_"+params.BaseHero, hero)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return hero, nil
-// }
-
-// func (repo *HeroRepositoryImpl) BatchUpdateHero(params []UpdateHeroParams) error {
-// 	setParams := make([]*databases.BadgerSetParams, 0)
-// 	for _, param := range params {
-// 		hero := repo.GetHeroBySessionId(HeroKey{
-// 			SessionId: param.SessionId,
-// 			PlayerId:  param.PlayerId,
-// 			BaseHero:  param.BaseHero,
-// 		})
-// 		if hero == nil {
-// 			return errors.New("invalid hero key")
-// 		}
-// 		if param.Health != nil {
-// 			hero.Health = *param.Health
-// 		}
-// 		if param.Position != nil {
-// 			hero.Position = *param.Position
-// 		}
-// 		if param.LastMoveTurn != nil {
-// 			hero.LastMoveTurn = *param.LastMoveTurn
-// 		}
-// 		if param.LastAttackTurn != nil {
-// 			hero.LastAttackTurn = *param.LastAttackTurn
-// 		}
-// 		setParams = append(setParams, &databases.BadgerSetParams{
-// 			Key:   BASE_HERO_PREFIX + hero.SessionId + "_" + hero.PlayerId + "_" + hero.BaseHero,
-// 			Value: hero,
-// 		})
-// 	}
-
-// 	return repo.badger.BatchSet(setParams)
-// }
-
-// func (repo *HeroRepositoryImpl) BatchCreateHeroes(params []CreateHeroParams) ([]*models.Hero, error) {
-// 	ret := make([]*models.Hero, 0)
-// 	setParams := make([]*databases.BadgerSetParams, 0)
-// 	for _, param := range params {
-// 		hero := &models.Hero{
-// 			Health:         param.Health,
-// 			Position:       param.Position,
-// 			LastMoveTurn:   param.LastMoveTurn,
-// 			LastAttackTurn: param.LastAttackTurn,
-// 			BaseHero:       param.BaseHero,
-// 			PlayerId:       param.PlayerId,
-// 			SessionId:      param.SessionId,
-// 		}
-// 		ret = append(ret, hero)
-// 		setParams = append(setParams, &databases.BadgerSetParams{
-// 			Key:   BASE_HERO_PREFIX + param.SessionId + "_" + param.PlayerId + "_" + param.BaseHero,
-// 			Value: hero,
-// 		})
-// 	}
-// 	err := repo.badger.BatchSet(setParams)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return ret, nil
-// }
 
 func (repo *HeroRepositoryImpl) DeleteHero(tx databases.BadgerTx, params HeroKey) error {
 	if tx == nil {

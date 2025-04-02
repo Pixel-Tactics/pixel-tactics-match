@@ -18,11 +18,17 @@ const (
 
 type HeroService interface {
 	GetStats(heroName heroes.BaseHeroEnum) *heroes.BaseHeroInfo
+
+	// Error will be returned when heroes array doesn't exist.
 	GetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string) ([]*models.Hero, error)
+
+	// Nil will be returned when hero doesn't exist.
 	GetPlayerHero(tx databases.BadgerTx, sessionId string, playerId string, baseHero heroes.BaseHeroEnum) (*models.Hero, error)
+
 	GetAvailableHeroes() []heroes.BaseHeroEnum
-	CreateHeroesTx(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
-	CreateHeroes(sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
+
+	// Sets heroes for specific player. The chosen heroes must be valid in terms of number, availability, and duplication.
+	CreateHeroes(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
 	InitHeroPosition(heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
 	InitHeroPositionTx(tx databases.BadgerTx, heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
 	GetInitialState(tx databases.BadgerTx, heroList1 []*models.Hero, heroList2 []*models.Hero) ([]*models.Hero, []*models.Hero, error)
@@ -37,6 +43,7 @@ type HeroService interface {
 
 type HeroServiceImpl struct {
 	HeroRepository repositories.HeroRepository
+	LogRepository  repositories.SessionLogRepository
 	SessionService SessionService
 	PlayerService  PlayerService
 
@@ -45,23 +52,8 @@ type HeroServiceImpl struct {
 	EventManager       events.EventManager
 }
 
-type AttackEvent struct {
-	Tx          databases.BadgerTx
-	CurrentTurn int
-	SrcHero     *models.Hero
-	DstHero     *models.Hero
-	Damage      int
-}
-
-type MoveEvent struct {
-	Tx          databases.BadgerTx
-	CurrentTurn int
-	SrcHero     *models.Hero
-	Position    physics.Point
-}
-
+// Error will be returned when heroes array doesn't exist.
 func (service *HeroServiceImpl) GetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string) ([]*models.Hero, error) {
-	// TODO: check whether not assigned returns error too or nil.. if error, which error
 	player, err := service.PlayerService.GetPlayer(tx, sessionId, playerId)
 	if err != nil {
 		return nil, err
@@ -70,15 +62,27 @@ func (service *HeroServiceImpl) GetPlayerHeroes(tx databases.BadgerTx, sessionId
 		return nil, errors.New("invalid player")
 	}
 
-	return service.HeroRepository.GetPlayerHeroes(nil, sessionId, playerId, player.HeroBases)
+	heroes, err := service.HeroRepository.GetPlayerHeroes(nil, sessionId, playerId, player.HeroBases)
+	if err != nil {
+		return nil, err
+	}
+	return heroes, err
 }
 
+// Nil will be returned when hero doesn't exist.
 func (service *HeroServiceImpl) GetPlayerHero(tx databases.BadgerTx, sessionId string, playerId string, baseHero heroes.BaseHeroEnum) (*models.Hero, error) {
-	return service.HeroRepository.GetHeroBySessionId(nil, repositories.HeroKey{
+	hero, err := service.HeroRepository.GetHeroBySessionId(nil, repositories.HeroKey{
 		SessionId: sessionId,
 		PlayerId:  playerId,
 		BaseHero:  baseHero,
 	})
+	if err != nil {
+		return nil, err
+	}
+	if hero == nil {
+		return nil, nil
+	}
+	return hero, err
 }
 
 func (service *HeroServiceImpl) GetStats(heroName heroes.BaseHeroEnum) *heroes.BaseHeroInfo {
@@ -90,20 +94,6 @@ func (service *HeroServiceImpl) MoveHero(tx databases.BadgerTx, currentTurn int,
 	srcHero.MovePosition(currentTurn, position)
 
 	_, err := service.HeroRepository.SaveHero(tx, srcHero)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (service *HeroServiceImpl) onMove(data interface{}) error {
-	moveData, ok := data.(*MoveEvent)
-	if !ok {
-		return errors.New("invalid data")
-	}
-
-	err := service.MoveHero(moveData.Tx, moveData.CurrentTurn, moveData.SrcHero, moveData.Position)
 	if err != nil {
 		return err
 	}
@@ -127,20 +117,6 @@ func (service *HeroServiceImpl) ApplyDamage(tx databases.BadgerTx, currentTurn i
 	return nil
 }
 
-func (service *HeroServiceImpl) onDamage(data interface{}) error {
-	attackData, ok := data.(*AttackEvent)
-	if !ok {
-		return errors.New("invalid data")
-	}
-
-	err := service.ApplyDamage(attackData.Tx, attackData.CurrentTurn, attackData.SrcHero, attackData.DstHero, attackData.Damage)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (service *HeroServiceImpl) GetAvailableHeroes() []heroes.BaseHeroEnum {
 	return []heroes.BaseHeroEnum{
 		heroes.BaseHeroKnight,
@@ -148,8 +124,8 @@ func (service *HeroServiceImpl) GetAvailableHeroes() []heroes.BaseHeroEnum {
 	}
 }
 
-func (service *HeroServiceImpl) CreateHeroesTx(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error {
-	// TODO: check whether not assigned returns error too or nil.. if error, which error
+// Sets heroes for specific player. The chosen heroes must be valid in terms of number, availability, and duplication.
+func (service *HeroServiceImpl) CreateHeroes(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error {
 	session, err := service.SessionService.GetSessionById(tx, sessionId)
 	if err != nil {
 		return err
@@ -180,23 +156,6 @@ func (service *HeroServiceImpl) CreateHeroesTx(tx databases.BadgerTx, sessionId 
 	}
 
 	err = service.PlayerService.SetPlayerHeroes(tx, sessionId, playerId, chosen)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (service *HeroServiceImpl) CreateHeroes(sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error {
-	tx := service.TransactionManager.NewReadWriteTransaction()
-	defer tx.Discard()
-
-	err := service.CreateHeroesTx(tx, sessionId, playerId, chosen)
-	if err != nil {
-		return err
-	}
-
-	err = tx.Commit()
 	if err != nil {
 		return err
 	}
@@ -301,6 +260,7 @@ func (service *HeroServiceImpl) SetHeroes(tx databases.BadgerTx, heroList []*mod
 	return nil
 }
 
+// Checks the validity of number of heroes, availability, and duplication.
 func (service *HeroServiceImpl) isChosenHeroesValid(available []heroes.BaseHeroEnum, chosen []heroes.BaseHeroEnum) bool {
 	if len(chosen) != NumberOfHero {
 		return false
@@ -355,7 +315,7 @@ func NewHeroService(
 		TransactionManager: transactionManager,
 		EventManager:       eventManager,
 	}
-	eventManager.On("MOVE", heroService.onMove)
-	eventManager.On("DAMAGE", heroService.onDamage)
+	// eventManager.On("MOVE", heroService.onMove)
+	// eventManager.On("DAMAGE", heroService.onDamage)
 	return heroService
 }

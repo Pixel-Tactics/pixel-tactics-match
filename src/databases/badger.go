@@ -101,7 +101,8 @@ func (db *BadgerImpl) Close() {
 }
 
 func NewBadgerImpl() *BadgerImpl {
-	db, err := badger.Open(badger.DefaultOptions(config.BadgerPath))
+	conf := badger.DefaultOptions(config.BadgerPath).WithInMemory(true)
+	db, err := badger.Open(conf)
 	if err != nil {
 		panic("invalid badger path")
 	}

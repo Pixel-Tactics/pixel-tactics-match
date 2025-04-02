@@ -13,34 +13,25 @@ const (
 )
 
 type PlayerRepository interface {
+	// When no key found (or empty) for player, nil player will be returned instead of error.
 	GetPlayerByIdAndSessionId(tx databases.BadgerTx, playerId string, sessionId string) (*models.Player, error)
 	SavePlayer(tx databases.BadgerTx, obj *models.Player) (*models.Player, error)
-	// CreatePlayer(tx databases.BadgerTx, params CreatePlayerParams) (*models.Player, error)
-	// UpdatePlayer(tx databases.BadgerTx, params UpdatePlayerParams) (*models.Player, error)
 	DeletePlayer(tx databases.BadgerTx, playerId string, sessionId string) error
 }
-
-// type CreatePlayerParams struct {
-// 	Id        string
-// 	SessionId string
-// }
-
-// type UpdatePlayerParams struct {
-// 	SessionId string
-// 	PlayerId  string
-// 	HeroBases []heroes.BaseHeroEnum
-// }
 
 type PlayerRepositoryImpl struct {
 	badger databases.Badger
 }
 
-// TODO: check behavior when unset, error or null
+// When no key found (or empty) for player, nil player will be returned instead of error.
 func (repo *PlayerRepositoryImpl) GetPlayerByIdAndSessionId(tx databases.BadgerTx, playerId string, sessionId string) (*models.Player, error) {
 	query := databases.GetQuery(tx, repo.badger)
 
 	var player models.Player
 	err := query.Get(PLAYERID_SESSIONID_TO_PLAYER+sessionId+"_"+playerId, &player)
+	if err != nil && err == databases.NotFoundException() {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -56,39 +47,6 @@ func (repo *PlayerRepositoryImpl) SavePlayer(tx databases.BadgerTx, obj *models.
 	}
 	return obj, nil
 }
-
-// func (repo *PlayerRepositoryImpl) CreatePlayer(tx databases.BadgerTx, params CreatePlayerParams) (*models.Player, error) {
-// 	query := databases.GetQuery(tx, repo.badger)
-
-// 	player := &models.Player{
-// 		Id:        params.Id,
-// 		SessionId: params.SessionId,
-// 	}
-// 	err := query.Set(PLAYERID_SESSIONID_TO_PLAYER+params.SessionId+"_"+params.Id, player)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return player, nil
-// }
-
-// func (repo *PlayerRepositoryImpl) UpdatePlayer(tx databases.BadgerTx, params UpdatePlayerParams) (*models.Player, error) {
-// 	if tx == nil {
-// 		return nil, errors.New("transaction object is null")
-// 	}
-
-// 	player := repo.GetPlayerByIdAndSessionId(tx, params.PlayerId, params.SessionId)
-// 	if player == nil {
-// 		return nil, errors.New("invalid player key")
-// 	}
-
-// 	player.HeroBases = params.HeroBases
-
-// 	err := tx.Set(PLAYERID_SESSIONID_TO_PLAYER+params.SessionId+"_"+params.PlayerId, player)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return player, nil
-// }
 
 func (repo *PlayerRepositoryImpl) DeletePlayer(tx databases.BadgerTx, playerId string, sessionId string) error {
 	if tx == nil {

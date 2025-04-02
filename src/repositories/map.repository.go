@@ -13,7 +13,8 @@ const (
 )
 
 type MapRepository interface {
-	GetMapBySessionId(tx databases.BadgerTx, sessionId string) *models.Map
+	// When no key found (or empty) for map, nil map will be returned instead of error.
+	GetMapBySessionId(tx databases.BadgerTx, sessionId string) (*models.Map, error)
 	SaveMap(tx databases.BadgerTx, obj *models.Map) (*models.Map, error)
 	DeleteMap(tx databases.BadgerTx, sessionId string) error
 }
@@ -27,15 +28,19 @@ type MapRepositoryImpl struct {
 	badger databases.Badger
 }
 
-func (repo *MapRepositoryImpl) GetMapBySessionId(tx databases.BadgerTx, sessionId string) *models.Map {
+// When no key found (or empty) for map, nil map will be returned instead of error.
+func (repo *MapRepositoryImpl) GetMapBySessionId(tx databases.BadgerTx, sessionId string) (*models.Map, error) {
 	query := databases.GetQuery(tx, repo.badger)
 
 	var sessionMap models.Map
 	err := query.Get(SESSIONID_TO_MAP+sessionId, &sessionMap)
-	if err != nil {
-		return nil
+	if err != nil && err == databases.NotFoundException() {
+		return nil, nil
 	}
-	return &sessionMap
+	if err != nil {
+		return nil, err
+	}
+	return &sessionMap, nil
 }
 
 func (repo *MapRepositoryImpl) SaveMap(tx databases.BadgerTx, obj *models.Map) (*models.Map, error) {

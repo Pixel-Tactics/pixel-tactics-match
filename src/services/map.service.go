@@ -24,7 +24,9 @@ func getMapTemplate() [][]int {
 }
 
 type MapService interface {
+	// SessionNotFound error will be returned when map doesn't exist.
 	GetSessionMap(tx databases.BadgerTx, sessionId string) (*models.Map, error)
+
 	GenerateMap(tx databases.BadgerTx, sessionId string) (*models.Map, error)
 	GetInitialState(tx databases.BadgerTx, sessionId string) (*models.Map, error)
 	IsPointOpen(tx databases.BadgerTx, session *models.Session, pos physics.Point) (bool, error)
@@ -38,8 +40,12 @@ type MapServiceImpl struct {
 	HeroService   HeroService
 }
 
+// SessionNotFound error will be returned when map doesn't exist.
 func (service *MapServiceImpl) GetSessionMap(tx databases.BadgerTx, sessionId string) (*models.Map, error) {
-	sessionMap := service.MapRepository.GetMapBySessionId(tx, sessionId)
+	sessionMap, err := service.MapRepository.GetMapBySessionId(tx, sessionId)
+	if err != nil {
+		return nil, err
+	}
 	if sessionMap == nil {
 		return nil, exceptions.SessionNotFound()
 	}

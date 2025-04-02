@@ -11,6 +11,7 @@ import (
 )
 
 type PlayerService interface {
+	// When no player found, nil player will be returned instead of error.
 	GetPlayer(tx databases.BadgerTx, playerId string, sessionId string) (*models.Player, error)
 	CreatePlayerForSession(tx databases.BadgerTx, sessionId string, playerId1 string, playerId2 string) error
 	SetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string, heroList []heroes.BaseHeroEnum) error
@@ -24,12 +25,12 @@ type PlayerServiceImpl struct {
 	SessionService SessionService
 }
 
+// When no player found, nil player will be returned instead of error.
 func (service *PlayerServiceImpl) GetPlayer(tx databases.BadgerTx, playerId string, sessionId string) (*models.Player, error) {
 	return service.PlayerRepository.GetPlayerByIdAndSessionId(tx, playerId, sessionId)
 }
 
 func (service *PlayerServiceImpl) CreatePlayerForSession(tx databases.BadgerTx, sessionId string, playerId1 string, playerId2 string) error {
-	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 	session, err := service.SessionService.GetSessionById(tx, sessionId)
 	if err != nil {
 		return err
@@ -61,7 +62,6 @@ func (service *PlayerServiceImpl) CreatePlayerForSession(tx databases.BadgerTx, 
 }
 
 func (service *PlayerServiceImpl) SetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string, heroList []heroes.BaseHeroEnum) error {
-	// TODO: check whether not assigned returns error or nil.. if error, which error (repo)
 	player, err := service.GetPlayer(tx, playerId, sessionId)
 	if err != nil {
 		return err
