@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"pixeltactics.com/match/src/databases"
-	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/exceptions"
 	"pixeltactics.com/match/src/heroes"
 	"pixeltactics.com/match/src/models"
@@ -49,7 +48,6 @@ type HeroServiceImpl struct {
 
 	HeroFactory        heroes.BaseHeroFactory
 	TransactionManager databases.TransactionManager
-	EventManager       events.EventManager
 }
 
 // Error will be returned when heroes array doesn't exist.
@@ -305,7 +303,6 @@ func NewHeroService(
 	playerService PlayerService,
 	heroFactory heroes.BaseHeroFactory,
 	transactionManager databases.TransactionManager,
-	eventManager events.EventManager,
 ) HeroService {
 	heroService := &HeroServiceImpl{
 		HeroRepository:     heroRepository,
@@ -313,9 +310,6 @@ func NewHeroService(
 		PlayerService:      playerService,
 		HeroFactory:        heroFactory,
 		TransactionManager: transactionManager,
-		EventManager:       eventManager,
 	}
-	// eventManager.On("MOVE", heroService.onMove)
-	// eventManager.On("DAMAGE", heroService.onDamage)
 	return heroService
 }

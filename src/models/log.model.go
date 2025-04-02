@@ -1,6 +1,7 @@
 package models
 
 type SessionLog struct {
-	Type string
-	Data map[string]interface{}
+	Type      string
+	SessionId string
+	Data      map[string]interface{}
 }

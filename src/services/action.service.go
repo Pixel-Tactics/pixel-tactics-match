@@ -5,7 +5,6 @@ import (
 
 	"pixeltactics.com/match/src/databases"
 	"pixeltactics.com/match/src/models"
-	"pixeltactics.com/match/src/repositories"
 	"pixeltactics.com/match/src/utils/algorithms"
 	convert_utils "pixeltactics.com/match/src/utils/convert"
 	"pixeltactics.com/match/src/utils/physics"
@@ -17,12 +16,12 @@ type ActionService interface {
 }
 
 type ActionServiceImpl struct {
-	mapService     MapService
-	heroService    HeroService
-	sessionService SessionService
+	MapService     MapService
+	HeroService    HeroService
+	SessionService SessionService
 
-	sessionLogRepository repositories.SessionLogRepository
-	transactionManager   databases.TransactionManager
+	LogService         LogService
+	TransactionManager databases.TransactionManager
 }
 
 type MoveSessionLog struct {
@@ -36,10 +35,10 @@ func (service *ActionServiceImpl) ApplyMoveLog(log MoveSessionLog, currentTurn i
 }
 
 func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHero string, directions []physics.Direction) error {
-	tx := service.transactionManager.NewReadWriteTransaction()
+	tx := service.TransactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
 
-	session, err := service.sessionService.GetSessionById(tx, sessionId)
+	session, err := service.SessionService.GetSessionById(tx, sessionId)
 	if err != nil {
 		return err
 	}
@@ -52,7 +51,7 @@ func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHe
 		return err
 	}
 
-	srcHero, err := service.heroService.GetPlayerHero(tx, sessionId, playerId, baseHero)
+	srcHero, err := service.HeroService.GetPlayerHero(tx, sessionId, playerId, baseHero)
 	if err != nil {
 		return err
 	}
@@ -64,7 +63,7 @@ func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHe
 		return errors.New("hero cannot move")
 	}
 
-	srcHeroStats := service.heroService.GetStats(srcHero.BaseHero)
+	srcHeroStats := service.HeroService.GetStats(srcHero.BaseHero)
 	if len(directions) > srcHeroStats.BaseStats.MoveRange {
 		return errors.New("invalid movement range")
 	}
@@ -73,7 +72,7 @@ func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHe
 	for _, dir := range directions {
 		dirPoint := physics.GetPointFromDirection(dir)
 		curPos = curPos.Add(dirPoint)
-		isPointOpen, err := service.mapService.IsPointOpen(tx, session, curPos)
+		isPointOpen, err := service.MapService.IsPointOpen(tx, session, curPos)
 		if err != nil {
 			return err
 		}
@@ -91,15 +90,16 @@ func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHe
 		return err
 	}
 
-	_, err = service.sessionLogRepository.AppendLog(tx, sessionId, &models.SessionLog{
-		Type: "MOVE",
-		Data: logObj,
+	err = service.LogService.AppendLog(tx, sessionId, &models.SessionLog{
+		Type:      "MOVE",
+		SessionId: sessionId,
+		Data:      logObj,
 	})
 	if err != nil {
 		return err
 	}
 
-	err = service.heroService.MoveHero(tx, session.CurrentTurn, srcHero, curPos)
+	err = service.HeroService.MoveHero(tx, session.CurrentTurn, srcHero, curPos)
 	if err != nil {
 		return err
 	}
@@ -124,10 +124,10 @@ type AttackSessionLog struct {
 }
 
 func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcBaseHero string, dstBaseHero string) error {
-	tx := service.transactionManager.NewReadWriteTransaction()
+	tx := service.TransactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
 
-	session, err := service.sessionService.GetSessionById(tx, sessionId)
+	session, err := service.SessionService.GetSessionById(tx, sessionId)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 		return errors.New("invalid session id")
 	}
 
-	srcHero, err := service.heroService.GetPlayerHero(tx, sessionId, playerId, srcBaseHero)
+	srcHero, err := service.HeroService.GetPlayerHero(tx, sessionId, playerId, srcBaseHero)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 	}
 
 	otherPlayerId, _ := session.GetOtherPlayerId(playerId)
-	dstHero, err := service.heroService.GetPlayerHero(tx, sessionId, otherPlayerId, dstBaseHero)
+	dstHero, err := service.HeroService.GetPlayerHero(tx, sessionId, otherPlayerId, dstBaseHero)
 	if err != nil {
 		return err
 	}
@@ -161,12 +161,12 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 		return errors.New("hero cannot attack")
 	}
 
-	srcHeroStats := service.heroService.GetStats(srcHero.BaseHero)
+	srcHeroStats := service.HeroService.GetStats(srcHero.BaseHero)
 
 	attackRange := srcHeroStats.BaseStats.AttackRange
 	damage := srcHeroStats.BaseStats.Damage
 
-	sessionMap, err := service.mapService.GetSessionMap(tx, sessionId)
+	sessionMap, err := service.MapService.GetSessionMap(tx, sessionId)
 	if err != nil {
 		return err
 	}
@@ -186,15 +186,16 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 		return err
 	}
 
-	_, err = service.sessionLogRepository.AppendLog(tx, sessionId, &models.SessionLog{
-		Type: "DAMAGE",
-		Data: logObj,
+	err = service.LogService.AppendLog(tx, sessionId, &models.SessionLog{
+		Type:      "DAMAGE",
+		SessionId: sessionId,
+		Data:      logObj,
 	})
 	if err != nil {
 		return err
 	}
 
-	err = service.heroService.ApplyDamage(tx, session.CurrentTurn, srcHero, dstHero, damage)
+	err = service.HeroService.ApplyDamage(tx, session.CurrentTurn, srcHero, dstHero, damage)
 	if err != nil {
 		return err
 	}
@@ -205,4 +206,20 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 	}
 
 	return nil
+}
+
+func NewActionService(
+	mapService MapService,
+	heroService HeroService,
+	sessionService SessionService,
+	logService LogService,
+	transactionManager databases.TransactionManager,
+) ActionService {
+	return &ActionServiceImpl{
+		MapService:         mapService,
+		HeroService:        heroService,
+		SessionService:     sessionService,
+		LogService:         logService,
+		TransactionManager: transactionManager,
+	}
 }

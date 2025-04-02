@@ -7,7 +7,6 @@ import (
 	"pixeltactics.com/match/src/config"
 	"pixeltactics.com/match/src/core/states"
 	"pixeltactics.com/match/src/databases"
-	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/gateway"
 	"pixeltactics.com/match/src/heroes"
 	"pixeltactics.com/match/src/repositories"
@@ -33,18 +32,21 @@ func main() {
 
 	heroFactory := heroes.NewBaseHeroFactory()
 	stateFactory := states.NewSessionStateFactory()
-	eventManager := events.NewSequentialEventManager()
+	// eventManager := events.NewSequentialEventManager()
 
 	mapRepo := repositories.NewMapRepository(badger)
 	heroRepo := repositories.NewHeroRepository(badger)
 	playerRepo := repositories.NewPlayerRepository(badger)
 	sessionRepo := repositories.NewSessionRepositoryV2(badger)
+	// logRepo := repositories.NewSessionLogRepository(badger)
 
 	authService := services.NewAuthService()
 	mapService := services.NewMapService(mapRepo, nil)
-	heroService := services.NewHeroService(heroRepo, nil, nil, heroFactory, badger, eventManager)
+	heroService := services.NewHeroService(heroRepo, nil, nil, heroFactory, badger)
 	playerService := services.NewPlayerService(playerRepo, nil)
+	// logService := services.NewLogService(logRepo, eventManager)
 	sessionService := services.NewSessionService(mapService, heroService, playerService, sessionRepo, stateFactory, badger)
+	// actionService := services.NewActionService(mapService, heroService, sessionService, logService, badger)
 
 	mapService.SetHeroService(heroService)
 	playerService.SetSessionService(sessionService)
