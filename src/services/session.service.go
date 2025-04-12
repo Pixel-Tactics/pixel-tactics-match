@@ -350,47 +350,30 @@ func (service *SessionServiceImpl) CompileSession(sessionId string) (map[string]
 	if err != nil {
 		return nil, err
 	}
-	// heroList1, err := service.HeroService.GetPlayerHeroes(nil, sessionId, session.PlayerIds[0])
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// compiledHero1 := make([]map[string]interface{}, 0)
-	// for _, hero := range heroList1 {
-	// 	compiledHero1 = append(compiledHero1, map[string]interface{}{
-
-	// 	})
-	// }
-	// heroList2, err := service.HeroService.GetPlayerHeroes(nil, sessionId, session.PlayerIds[1])
-	// if err != nil {
-	// 	return nil, err
-	// }
+	heroList1, err := service.HeroService.GetPlayerHeroes(nil, sessionId, session.PlayerIds[0])
+	if err != nil {
+		return nil, err
+	}
+	heroList2, err := service.HeroService.GetPlayerHeroes(nil, sessionId, session.PlayerIds[1])
+	if err != nil {
+		return nil, err
+	}
 	return map[string]interface{}{
 		"id": session.Id,
-		// "player1": map[string]interface{}{
-		// 	"id":       session.PlayerIds[0],
-		// 	"heroList": heroList1,
-		// },
-		// "player2": map[string]interface{}{
-		// 	"id":       session.PlayerIds[1],
-		// 	"heroList": heroList2,
-		// },
+		"player1": map[string]interface{}{
+			"id":       session.PlayerIds[0],
+			"heroList": heroList1,
+		},
+		"player2": map[string]interface{}{
+			"id":       session.PlayerIds[1],
+			"heroList": heroList2,
+		},
 		"state":             state,
 		"availableHeroList": session.AllowedHeroList,
 		"matchMap":          matchMap,
 		"actionLog":         make([]map[string]interface{}, 0),
 	}, nil
 }
-
-// func (p *Player) GetData() map[string]interface{} {
-// 	var heroListData = []map[string]interface{}{}
-// 	for _, hero := range p.HeroList {
-// 		heroListData = append(heroListData, hero.GetData())
-// 	}
-// 	return map[string]interface{}{
-// 		"id":       p.Id,
-// 		"heroList": heroListData,
-// 	}
-// }
 
 func NewSessionService(
 	mapService MapService,

@@ -183,6 +183,35 @@ func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessa
 
 	var message string
 	if isStarted {
+		session, err := gateway.SessionService.GetSessionByPlayerId(nil, *client.ClientId)
+		var notifyMessage string
+		if err != nil {
+			notifyMessage = "Battle is started, but error on showing data"
+		}
+
+		response, err := gateway.SessionService.CompileSession(session.Id)
+		if err != nil {
+			notifyMessage = "Battle is started, but error on showing data"
+		}
+
+		otherId, _ := session.GetOtherPlayerId(*client.ClientId)
+		client.Send(otherId, &messages.Message{
+			Type: TYPE_START_BATTLE,
+			Body: map[string]interface{}{
+				"message":    notifyMessage,
+				"opponentId": *client.ClientId,
+				"session":    response,
+			},
+		})
+		client.Send(*client.ClientId, &messages.Message{
+			Type: TYPE_START_BATTLE,
+			Body: map[string]interface{}{
+				"message":    notifyMessage,
+				"opponentId": otherId,
+				"session":    response,
+			},
+		})
+
 		message = "Battle is started.."
 		log.Println("Battle is started..")
 	} else {

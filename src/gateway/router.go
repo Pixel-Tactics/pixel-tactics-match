@@ -20,12 +20,12 @@ const (
 	// TYPE_ERROR          string = "ERROR_FEEDBACK"
 	// TYPE_FEEDBACK       string = "FEEDBACK"
 	// TYPE_ENEMY_ACTION   string = "ENEMY_ACTION"
-	// TYPE_START_BATTLE   string = "START_BATTLE"
 	// TYPE_END_TURN       string = "END_TURN"
 
 	// Response
 	TYPE_INVITE_SESSION string = "INVITE_SESSION"
 	TYPE_START_SESSION  string = "START_SESSION"
+	TYPE_START_BATTLE   string = "START_BATTLE"
 )
 
 type Router interface {
