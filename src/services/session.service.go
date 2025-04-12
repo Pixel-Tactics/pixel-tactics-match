@@ -28,7 +28,8 @@ type SessionService interface {
 	// When no key found (or empty) for session, nil session will be returned instead of error.
 	GetSessionByPlayerId(playerId string) (*models.Session, error)
 
-	// When no key found (or empty) for session, nil session will be returned instead of error.
+	// Creates session object for player and opponent. If it was empty, player invites opponent.
+	// But if the opponent already invited player, it will start the match by going into preparation state.
 	CreateSession(playerId string, opponentId string) (*models.Session, error)
 
 	PreparePlayer(playerId string, chosenHeroes []heroes.BaseHeroEnum) (bool, error)
@@ -60,6 +61,8 @@ func (service *SessionServiceImpl) GetSessionByPlayerId(playerId string) (*model
 	return service.SessionRepository.GetSessionByPlayerId(nil, playerId)
 }
 
+// Creates session object for player and opponent. If it was empty, player invites opponent.
+// But if the opponent already invited player, it will start the match by going into preparation state.
 func (service *SessionServiceImpl) CreateSession(playerId string, opponentId string) (*models.Session, error) {
 	tx := service.TransactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
@@ -137,6 +140,7 @@ func (service *SessionServiceImpl) CreateSession(playerId string, opponentId str
 	return session, nil
 }
 
+// Start the preparation state
 func (service *SessionServiceImpl) runSession(tx databases.BadgerTx, session *models.Session) error {
 	preparationDeadline := time.Now().Add(PreparationTime)
 	sessionState := service.StateFactory.Create(session)
@@ -156,6 +160,7 @@ func (service *SessionServiceImpl) runSession(tx databases.BadgerTx, session *mo
 	return nil
 }
 
+// Chooses heroes for player. It returns boolean that represents whether the preparation ends (other player have chosen their heroes too) or not.
 func (service *SessionServiceImpl) PreparePlayer(playerId string, chosenHeroes []heroes.BaseHeroEnum) (bool, error) {
 	tx := service.TransactionManager.NewReadWriteTransaction()
 	defer tx.Discard()

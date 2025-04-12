@@ -20,6 +20,7 @@ func (state *PreparationState) Start(deadline time.Time) error {
 		Type:     models.SessionStatePlayer1Turn,
 		Deadline: deadline,
 	}
+	// TODO: move state update event to be in channel to handle kafka fails
 	return sendStateUpdateEvent(state.EventManager, state.Session.Id, state.Session.State)
 }
 

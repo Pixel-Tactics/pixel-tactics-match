@@ -173,66 +173,19 @@ func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessa
 		return
 	}
 
-	// TODO: was doing
-	// isStarted, err := gateway.SessionService.PreparePlayer(*client.ClientId, body.ChosenHeroList)
-	// if err != nil {
-	// 	client.SendBack(Error(err))
-	// 	return
-	// }
+	_, err = gateway.SessionService.PreparePlayer(*client.ClientId, body.ChosenHeroList)
+	if err != nil {
+		client.SendBack(Error(err))
+		return
+	}
 
-	// client.SendBack(&messages.Message{
-	// 	Type: client.Message.Type,
-	// 	Body: map[string]interface{}{
-	// 		"success": true,
-	// 	},
-	// })
+	client.SendBack(&messages.Message{
+		Type: client.Message.Type,
+		Body: map[string]interface{}{
+			"success": true,
+		},
+	})
 }
-
-// func (gateway *SessionGatewayImpl) ExecuteAction(client *messages.WebSocketMessager) {
-// 	var body dto.ExecuteActionRequestDTO
-// 	err := convert_utils.MapToObject(req.Message.Body, &body)
-// 	if err != nil {
-// 		res.SendToClient(responses.ErrorMessage(err))
-// 		return
-// 	}
-
-// 	err = handler.matchService.ExecuteAction(body)
-// 	if err != nil {
-// 		res.SendToClient(responses.ErrorMessage(err))
-// 		return
-// 	}
-// }
-
-// func (gateway *SessionGatewayImpl) EndTurn(client *messages.WebSocketMessager) {
-// 	playerIdInterface, ok := req.Message.Body["playerId"]
-// 	if !ok {
-// 		res.SendToClient(responses.ErrorMessage(errors.New("no player id")))
-// 		return
-// 	}
-// 	playerId, ok := playerIdInterface.(string)
-// 	if !ok {
-// 		res.SendToClient(responses.ErrorMessage(errors.New("player id must be a string")))
-// 		return
-// 	}
-
-// 	err := handler.matchService.EndTurn(playerId)
-// 	if err != nil {
-// 		res.SendToClient(responses.ErrorMessage(err))
-// 		return
-// 	}
-// }
-
-// func (gateway *SessionGatewayImpl) GetServerTime(client *messages.WebSocketMessager) {
-// 	curTime := float64(handler.matchService.GetServerTime().UnixMilli())
-// 	resTime := curTime / 1000.0
-// 	res.SendToClient(&ws_types.Message{
-// 		Action: ws_types.ACTION_FEEDBACK,
-// 		Body: map[string]interface{}{
-// 			"localTime":  req.Message.Body["localTime"],
-// 			"serverTime": resTime,
-// 		},
-// 	})
-// }
 
 func NewSessionGateway(
 	sessionService services.SessionService,
