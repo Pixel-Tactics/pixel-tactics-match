@@ -181,14 +181,19 @@ func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessa
 		return
 	}
 
+	var message string
 	if isStarted {
+		message = "Battle is started.."
 		log.Println("Battle is started..")
+	} else {
+		message = "Waiting for other player.."
 	}
 
 	client.SendBack(&messages.Message{
 		Type: client.Message.Type,
 		Body: map[string]interface{}{
 			"success": true,
+			"message": message,
 		},
 	})
 }
