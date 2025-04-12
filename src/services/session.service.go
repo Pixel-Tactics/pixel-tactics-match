@@ -41,6 +41,7 @@ type SessionServiceImpl struct {
 	HeroService       HeroService
 	PlayerService     PlayerService
 	SessionRepository repositories.SessionRepositoryV2
+	LogRepository     repositories.SessionLogRepository
 
 	StateFactory       states.SessionStateFactory
 	TransactionManager databases.TransactionManager
@@ -328,12 +329,6 @@ func (service *SessionServiceImpl) checkOpponentSession(tx databases.BadgerTx, p
 }
 
 func (service *SessionServiceImpl) CompileSession(sessionId string) (map[string]interface{}, error) {
-	// actionLogData := []map[string]interface{}{}
-	// for i, actionLog := range session.actionLog {
-	// 	actionData := actionLog.GetData()
-	// 	actionData["order"] = i
-	// 	actionLogData = append(actionLogData, actionData)
-	// }
 	session, err := service.GetSessionById(nil, sessionId)
 	if err != nil {
 		return nil, err
@@ -351,13 +346,23 @@ func (service *SessionServiceImpl) CompileSession(sessionId string) (map[string]
 		return nil, err
 	}
 	heroList1, err := service.HeroService.GetPlayerHeroes(nil, sessionId, session.PlayerIds[0])
-	if err != nil {
+	if err != nil && err == ErrEmptyHero {
+		heroList1 = make([]*models.Hero, 0)
+	} else if err != nil {
 		return nil, err
 	}
 	heroList2, err := service.HeroService.GetPlayerHeroes(nil, sessionId, session.PlayerIds[1])
+	if err != nil && err == ErrEmptyHero {
+		heroList2 = make([]*models.Hero, 0)
+	} else if err != nil {
+		return nil, err
+	}
+
+	logs, err := service.LogRepository.GetSessionLogs(nil, sessionId)
 	if err != nil {
 		return nil, err
 	}
+
 	return map[string]interface{}{
 		"id": session.Id,
 		"player1": map[string]interface{}{
@@ -371,7 +376,7 @@ func (service *SessionServiceImpl) CompileSession(sessionId string) (map[string]
 		"state":             state,
 		"availableHeroList": session.AllowedHeroList,
 		"matchMap":          matchMap,
-		"actionLog":         make([]map[string]interface{}, 0),
+		"logs":              logs,
 	}, nil
 }
 
@@ -382,6 +387,7 @@ func NewSessionService(
 	sessionRepository repositories.SessionRepositoryV2,
 	stateFactory states.SessionStateFactory,
 	transactionManager databases.TransactionManager,
+	logRepository repositories.SessionLogRepository,
 ) SessionService {
 	return &SessionServiceImpl{
 		MapService:         mapService,
@@ -390,5 +396,6 @@ func NewSessionService(
 		SessionRepository:  sessionRepository,
 		StateFactory:       stateFactory,
 		TransactionManager: transactionManager,
+		LogRepository:      logRepository,
 	}
 }

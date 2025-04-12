@@ -61,7 +61,7 @@ func (service *HeroServiceImpl) GetPlayerHeroes(tx databases.BadgerTx, sessionId
 	}
 
 	if len(player.HeroBases) == 0 {
-		return nil, errors.New("player doesn't have hero")
+		return nil, ErrEmptyHero
 	}
 
 	heroes, err := service.HeroRepository.GetPlayerHeroes(nil, sessionId, playerId, player.HeroBases)

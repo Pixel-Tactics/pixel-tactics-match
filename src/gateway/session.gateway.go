@@ -134,6 +134,8 @@ func (gateway *SessionGatewayImpl) CreateSession(client *messages.WebSocketMessa
 		message := "successfully created session"
 		response, err := gateway.SessionService.CompileSession(session.Id)
 		if err != nil {
+			log.Println("BELLOW HEHE")
+			log.Println(err)
 			message = "successfully created session, but error on showing data"
 		}
 		client.Send(body.OpponentId, &messages.Message{
@@ -186,11 +188,13 @@ func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessa
 		session, err := gateway.SessionService.GetSessionByPlayerId(nil, *client.ClientId)
 		var notifyMessage string
 		if err != nil {
+			log.Println(err)
 			notifyMessage = "Battle is started, but error on showing data"
 		}
 
 		response, err := gateway.SessionService.CompileSession(session.Id)
 		if err != nil {
+			log.Println(err)
 			notifyMessage = "Battle is started, but error on showing data"
 		}
 

@@ -43,7 +43,7 @@ func main() {
 	heroService := services.NewHeroService(heroRepo, nil, nil, heroFactory, badger)
 	playerService := services.NewPlayerService(playerRepo, nil)
 	logService := services.NewLogService(logRepo, eventManager)
-	sessionService := services.NewSessionService(mapService, heroService, playerService, sessionRepo, stateFactory, badger)
+	sessionService := services.NewSessionService(mapService, heroService, playerService, sessionRepo, stateFactory, badger, logRepo)
 	actionService := services.NewActionService(mapService, heroService, sessionService, logService, badger)
 
 	mapService.SetHeroService(heroService)
