@@ -97,12 +97,12 @@ func (repo *SessionRepositoryV2Impl) SaveSession(tx databases.BadgerTx, obj *mod
 		return nil, err
 	}
 
-	err = tx.Set(PLAYERID_TO_SESSION+obj.PlayerIds[0], obj)
+	err = tx.Set(PLAYERID_TO_SESSION+obj.PlayerIds[0], obj.Id)
 	if err != nil {
 		return nil, err
 	}
 
-	err = tx.Set(PLAYERID_TO_SESSION+obj.PlayerIds[1], obj)
+	err = tx.Set(PLAYERID_TO_SESSION+obj.PlayerIds[1], obj.Id)
 	if err != nil {
 		return nil, err
 	}

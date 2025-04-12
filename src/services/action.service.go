@@ -11,8 +11,8 @@ import (
 )
 
 type ActionService interface {
-	Move(sessionId string, playerId string, baseHero string, directions []physics.Direction) error
-	Attack(sessionId string, playerId string, srcBaseHero string, dstBaseHero string) error
+	Move(playerId string, baseHero string, directions []physics.Direction) error
+	Attack(playerId string, srcBaseHero string, dstBaseHero string) error
 }
 
 type ActionServiceImpl struct {
@@ -34,11 +34,11 @@ func (service *ActionServiceImpl) ApplyMoveLog(log MoveSessionLog, currentTurn i
 	srcHero.MovePosition(currentTurn, log.Point)
 }
 
-func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHero string, directions []physics.Direction) error {
+func (service *ActionServiceImpl) Move(playerId string, baseHero string, directions []physics.Direction) error {
 	tx := service.TransactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
 
-	session, err := service.SessionService.GetSessionById(tx, sessionId)
+	session, err := service.SessionService.GetSessionByPlayerId(tx, playerId)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHe
 		return err
 	}
 
-	srcHero, err := service.HeroService.GetPlayerHero(tx, sessionId, playerId, baseHero)
+	srcHero, err := service.HeroService.GetPlayerHero(tx, session.Id, playerId, baseHero)
 	if err != nil {
 		return err
 	}
@@ -90,9 +90,9 @@ func (service *ActionServiceImpl) Move(sessionId string, playerId string, baseHe
 		return err
 	}
 
-	err = service.LogService.AppendLog(tx, sessionId, &models.SessionLog{
+	err = service.LogService.AppendLog(tx, session.Id, &models.SessionLog{
 		Type:      "MOVE",
-		SessionId: sessionId,
+		SessionId: session.Id,
 		Data:      logObj,
 	})
 	if err != nil {
@@ -123,11 +123,11 @@ type AttackSessionLog struct {
 	Damage      int
 }
 
-func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcBaseHero string, dstBaseHero string) error {
+func (service *ActionServiceImpl) Attack(playerId string, srcBaseHero string, dstBaseHero string) error {
 	tx := service.TransactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
 
-	session, err := service.SessionService.GetSessionById(tx, sessionId)
+	session, err := service.SessionService.GetSessionByPlayerId(tx, playerId)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 		return errors.New("invalid session id")
 	}
 
-	srcHero, err := service.HeroService.GetPlayerHero(tx, sessionId, playerId, srcBaseHero)
+	srcHero, err := service.HeroService.GetPlayerHero(tx, session.Id, playerId, srcBaseHero)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 	}
 
 	otherPlayerId, _ := session.GetOtherPlayerId(playerId)
-	dstHero, err := service.HeroService.GetPlayerHero(tx, sessionId, otherPlayerId, dstBaseHero)
+	dstHero, err := service.HeroService.GetPlayerHero(tx, session.Id, otherPlayerId, dstBaseHero)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 	attackRange := srcHeroStats.BaseStats.AttackRange
 	damage := srcHeroStats.BaseStats.Damage
 
-	sessionMap, err := service.MapService.GetSessionMap(tx, sessionId)
+	sessionMap, err := service.MapService.GetSessionMap(tx, session.Id)
 	if err != nil {
 		return err
 	}
@@ -186,9 +186,9 @@ func (service *ActionServiceImpl) Attack(sessionId string, playerId string, srcB
 		return err
 	}
 
-	err = service.LogService.AppendLog(tx, sessionId, &models.SessionLog{
+	err = service.LogService.AppendLog(tx, session.Id, &models.SessionLog{
 		Type:      "DAMAGE",
-		SessionId: sessionId,
+		SessionId: session.Id,
 		Data:      logObj,
 	})
 	if err != nil {

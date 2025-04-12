@@ -26,7 +26,7 @@ type SessionService interface {
 	GetSessionById(tx databases.BadgerTx, sessionId string) (*models.Session, error)
 
 	// When no key found (or empty) for session, nil session will be returned instead of error.
-	GetSessionByPlayerId(playerId string) (*models.Session, error)
+	GetSessionByPlayerId(tx databases.BadgerTx, playerId string) (*models.Session, error)
 
 	// Creates session object for player and opponent. If it was empty, player invites opponent.
 	// But if the opponent already invited player, it will start the match by going into preparation state.
@@ -52,13 +52,8 @@ func (service *SessionServiceImpl) GetSessionById(tx databases.BadgerTx, session
 }
 
 // When no key found (or empty) for session, nil session will be returned instead of error.
-func (service *SessionServiceImpl) GetSessionByPlayerIdTx(tx databases.BadgerTx, playerId string) (*models.Session, error) {
+func (service *SessionServiceImpl) GetSessionByPlayerId(tx databases.BadgerTx, playerId string) (*models.Session, error) {
 	return service.SessionRepository.GetSessionByPlayerId(tx, playerId)
-}
-
-// When no key found (or empty) for session, nil session will be returned instead of error.
-func (service *SessionServiceImpl) GetSessionByPlayerId(playerId string) (*models.Session, error) {
-	return service.SessionRepository.GetSessionByPlayerId(nil, playerId)
 }
 
 // Creates session object for player and opponent. If it was empty, player invites opponent.
@@ -177,17 +172,20 @@ func (service *SessionServiceImpl) PreparePlayer(playerId string, chosenHeroes [
 		return false, exceptions.ExceededDeadlineError()
 	}
 
-	err = service.HeroService.CreateHeroes(tx, session.Id, playerId, chosenHeroes)
+	heroList, err := service.HeroService.CreateHeroes(tx, session.Id, playerId, chosenHeroes)
 	if err != nil {
 		return false, err
 	}
 
-	err = service.StartBattle(tx, session)
+	err = service.startBattle(tx, playerId, heroList, session)
+	log.Println(err)
 
 	var otherPlayerNotPicked = false
 	if err != nil {
 		otherPlayerNotPicked = err.Error() == exceptions.HeroPickupError().Error()
 	}
+
+	log.Println(otherPlayerNotPicked)
 
 	if err == nil || otherPlayerNotPicked {
 		err = tx.Commit()
@@ -195,12 +193,13 @@ func (service *SessionServiceImpl) PreparePlayer(playerId string, chosenHeroes [
 			log.Println("Error when commiting player preparation")
 			return false, err
 		}
+		log.Println("Commited Preparation..")
 		return !otherPlayerNotPicked, nil
 	}
 	return false, err
 }
 
-func (service *SessionServiceImpl) StartBattle(tx databases.BadgerTx, session *models.Session) error {
+func (service *SessionServiceImpl) startBattle(tx databases.BadgerTx, playerId string, playerHeroList []*models.Hero, session *models.Session) error {
 	if session.State.Type != models.SessionStatePreparation {
 		return exceptions.ActionNotAllowed()
 	}
@@ -224,10 +223,22 @@ func (service *SessionServiceImpl) StartBattle(tx databases.BadgerTx, session *m
 		return errors.New("invalid player 1")
 	}
 
-	heroList1, err1 := service.HeroService.GetPlayerHeroes(tx, session.Id, player1.Id)
-	heroList2, err2 := service.HeroService.GetPlayerHeroes(tx, session.Id, player2.Id)
-	if err1 != nil || err2 != nil {
-		return exceptions.HeroPickupError()
+	var heroList1 []*models.Hero
+	var heroList2 []*models.Hero
+	if playerId == session.PlayerIds[0] {
+		heroList1 = playerHeroList
+		heroList2, err := service.HeroService.GetPlayerHeroes(tx, session.Id, player2.Id)
+		if err != nil || len(heroList2) == 0 {
+			log.Println("Cannot start match yet (" + err.Error() + ")..")
+			return exceptions.HeroPickupError()
+		}
+	} else {
+		heroList1, err := service.HeroService.GetPlayerHeroes(tx, session.Id, player1.Id)
+		heroList2 = playerHeroList
+		if err != nil || len(heroList1) == 0 {
+			log.Println("Cannot start match yet (" + err.Error() + ")..")
+			return exceptions.HeroPickupError()
+		}
 	}
 
 	sessionMap, err := service.MapService.GetSessionMap(tx, session.Id)

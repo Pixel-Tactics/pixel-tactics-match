@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/dgraph-io/badger/v4"
-	"pixeltactics.com/match/src/config"
 )
 
 type Badger interface {
@@ -101,10 +100,10 @@ func (db *BadgerImpl) Close() {
 }
 
 func NewBadgerImpl() *BadgerImpl {
-	conf := badger.DefaultOptions(config.BadgerPath).WithInMemory(true)
+	conf := badger.DefaultOptions("").WithInMemory(true)
 	db, err := badger.Open(conf)
 	if err != nil {
-		panic("invalid badger path")
+		panic(err)
 	}
 	return &BadgerImpl{
 		badger: db,

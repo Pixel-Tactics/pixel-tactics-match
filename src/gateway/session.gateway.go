@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"log"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"pixeltactics.com/match/src/dto"
@@ -16,6 +17,7 @@ type SessionGateway interface {
 	GetSession(client *messages.WebSocketMessager)
 	CreateSession(client *messages.WebSocketMessager)
 	PreparePlayer(client *messages.WebSocketMessager)
+	GetServerTime(client *messages.WebSocketMessager)
 }
 
 type SessionGatewayImpl struct {
@@ -37,7 +39,7 @@ func (gateway *SessionGatewayImpl) GetIsPlayerInSession(client *messages.WebSock
 		return
 	}
 
-	session, err := gateway.SessionService.GetSessionByPlayerId(body.PlayerId)
+	session, err := gateway.SessionService.GetSessionByPlayerId(nil, body.PlayerId)
 	if err != nil {
 		client.SendBack(Error(err))
 		return
@@ -65,7 +67,7 @@ func (gateway *SessionGatewayImpl) GetSession(client *messages.WebSocketMessager
 		return
 	}
 
-	session, err := gateway.SessionService.GetSessionByPlayerId(body.PlayerId)
+	session, err := gateway.SessionService.GetSessionByPlayerId(nil, body.PlayerId)
 	if err != nil {
 		client.SendBack(Error(err))
 		return
@@ -173,16 +175,47 @@ func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessa
 		return
 	}
 
-	_, err = gateway.SessionService.PreparePlayer(*client.ClientId, body.ChosenHeroList)
+	isStarted, err := gateway.SessionService.PreparePlayer(*client.ClientId, body.ChosenHeroList)
 	if err != nil {
 		client.SendBack(Error(err))
 		return
+	}
+
+	if isStarted {
+		log.Println("Battle is started..")
 	}
 
 	client.SendBack(&messages.Message{
 		Type: client.Message.Type,
 		Body: map[string]interface{}{
 			"success": true,
+		},
+	})
+}
+
+func (gateway *SessionGatewayImpl) GetServerTime(client *messages.WebSocketMessager) {
+	var body dto.ServerTimeRequest
+	err := convert_utils.MapToObject(client.Message.Body, &body)
+	if err != nil {
+		client.SendBack(Error(err))
+		return
+	}
+
+	err = gateway.Validator.Struct(body)
+	if err != nil {
+		log.Println(err)
+		client.SendBack(Error(errors.New("invalid input")))
+		return
+	}
+
+	curTime := float64(time.Now().UnixMilli())
+	resTime := curTime / 1000.0
+
+	client.SendBack(&messages.Message{
+		Type: client.Message.Type,
+		Body: map[string]interface{}{
+			"localTime":  body.LocalTime,
+			"serverTime": resTime,
 		},
 	})
 }

@@ -27,7 +27,7 @@ type HeroService interface {
 	GetAvailableHeroes() []heroes.BaseHeroEnum
 
 	// Sets heroes for specific player. The chosen heroes must be valid in terms of number, availability, and duplication.
-	CreateHeroes(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error
+	CreateHeroes(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) ([]*models.Hero, error)
 	InitHeroPosition(heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
 	InitHeroPositionTx(tx databases.BadgerTx, heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
 	GetInitialState(tx databases.BadgerTx, heroList1 []*models.Hero, heroList2 []*models.Hero) ([]*models.Hero, []*models.Hero, error)
@@ -52,12 +52,16 @@ type HeroServiceImpl struct {
 
 // Error will be returned when heroes array doesn't exist.
 func (service *HeroServiceImpl) GetPlayerHeroes(tx databases.BadgerTx, sessionId string, playerId string) ([]*models.Hero, error) {
-	player, err := service.PlayerService.GetPlayer(tx, sessionId, playerId)
+	player, err := service.PlayerService.GetPlayer(tx, playerId, sessionId)
 	if err != nil {
 		return nil, err
 	}
 	if player == nil {
 		return nil, errors.New("invalid player")
+	}
+
+	if len(player.HeroBases) == 0 {
+		return nil, errors.New("player doesn't have hero")
 	}
 
 	heroes, err := service.HeroRepository.GetPlayerHeroes(nil, sessionId, playerId, player.HeroBases)
@@ -123,42 +127,45 @@ func (service *HeroServiceImpl) GetAvailableHeroes() []heroes.BaseHeroEnum {
 }
 
 // Sets heroes for specific player. The chosen heroes must be valid in terms of number, availability, and duplication.
-func (service *HeroServiceImpl) CreateHeroes(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) error {
+func (service *HeroServiceImpl) CreateHeroes(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) ([]*models.Hero, error) {
 	session, err := service.SessionService.GetSessionById(tx, sessionId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if session == nil {
-		return exceptions.SessionNotFound()
+		return nil, exceptions.SessionNotFound()
 	}
 
 	isValid := service.isChosenHeroesValid(session.AllowedHeroList, chosen)
 	if !isValid {
-		return exceptions.HeroPickupError()
+		return nil, exceptions.HeroPickupError()
 	}
 
+	heroList := make([]*models.Hero, 0)
 	for _, heroEnum := range chosen {
 		baseHero := service.HeroFactory.Create(heroEnum)
 		baseHeroInfo := baseHero.GetInfo()
-		_, err := service.HeroRepository.SaveHero(tx, &models.Hero{
+		hero := &models.Hero{
 			Health:         baseHeroInfo.BaseStats.MaxHealth,
 			LastMoveTurn:   -2,
 			LastAttackTurn: -2,
 			BaseHero:       heroEnum,
 			PlayerId:       playerId,
 			SessionId:      session.Id,
-		})
-		if err != nil {
-			return err
 		}
+		_, err := service.HeroRepository.SaveHero(tx, hero)
+		if err != nil {
+			return nil, err
+		}
+		heroList = append(heroList, hero)
 	}
 
 	err = service.PlayerService.SetPlayerHeroes(tx, sessionId, playerId, chosen)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return heroList, nil
 }
 
 func (service *HeroServiceImpl) InitHeroPositionTx(

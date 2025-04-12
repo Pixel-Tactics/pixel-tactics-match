@@ -7,21 +7,25 @@ import (
 )
 
 const (
+	// Request
 	TYPE_CREATE_SESSION string = "CREATE_SESSION"
-	TYPE_IS_IN_SESSION  string = "IS_IN_SESSION"
-	TYPE_GET_SESSION    string = "GET_SESSION"
-	TYPE_INVITE_SESSION string = "INVITE_SESSION"
-	TYPE_START_SESSION  string = "START_SESSION"
+	// TYPE_IS_IN_SESSION  string = "IS_IN_SESSION"
+	// TYPE_GET_SESSION    string = "GET_SESSION"
+
 	TYPE_PREPARE_PLAYER string = "PREPARE_PLAYER"
 	TYPE_SERVER_TIME    string = "SERVER_TIME"
 	TYPE_AUTH           string = "AUTH"
-	TYPE_ERROR          string = "ERROR_FEEDBACK"
-	TYPE_FEEDBACK       string = "FEEDBACK"
-	TYPE_ENEMY_ACTION   string = "ENEMY_ACTION"
-	TYPE_START_BATTLE   string = "START_BATTLE"
-	TYPE_EXECUTE_ACTION string = "EXECUTE_ACTION"
-	TYPE_APPLY_ACTION   string = "APPLY_ACTION"
-	TYPE_END_TURN       string = "END_TURN"
+	TYPE_MOVE           string = "ACTION_MOVE"
+	TYPE_ATTACK         string = "ACTION_ATTACK"
+	// TYPE_ERROR          string = "ERROR_FEEDBACK"
+	// TYPE_FEEDBACK       string = "FEEDBACK"
+	// TYPE_ENEMY_ACTION   string = "ENEMY_ACTION"
+	// TYPE_START_BATTLE   string = "START_BATTLE"
+	// TYPE_END_TURN       string = "END_TURN"
+
+	// Response
+	TYPE_INVITE_SESSION string = "INVITE_SESSION"
+	TYPE_START_SESSION  string = "START_SESSION"
 )
 
 type Router interface {
@@ -31,16 +35,24 @@ type Router interface {
 type RouterImpl struct {
 	AuthGateway    AuthGateway
 	SessionGateway SessionGateway
+	ActionGateway  ActionGateway
 }
 
 func (router *RouterImpl) RouteMessage(client *messages.WebSocketMessager) {
-	if client.Message.Type == TYPE_AUTH {
+	switch client.Message.Type {
+	case TYPE_AUTH:
 		router.AuthGateway.AuthenticateClient(client)
-	} else if client.Message.Type == TYPE_CREATE_SESSION {
+	case TYPE_CREATE_SESSION:
 		router.SessionGateway.CreateSession(client)
-	} else if client.Message.Type == TYPE_PREPARE_PLAYER {
+	case TYPE_PREPARE_PLAYER:
 		router.SessionGateway.PreparePlayer(client)
-	} else {
+	case TYPE_SERVER_TIME:
+		router.SessionGateway.GetServerTime(client)
+	case TYPE_MOVE:
+		router.ActionGateway.Move(client)
+	case TYPE_ATTACK:
+		router.ActionGateway.Attack(client)
+	default:
 		client.SendBack(Error(errors.New("invalid type")))
 	}
 }
@@ -48,9 +60,11 @@ func (router *RouterImpl) RouteMessage(client *messages.WebSocketMessager) {
 func NewRouter(
 	authGateway AuthGateway,
 	sessionGateway SessionGateway,
+	actionGateway ActionGateway,
 ) Router {
 	return &RouterImpl{
 		AuthGateway:    authGateway,
 		SessionGateway: sessionGateway,
+		ActionGateway:  actionGateway,
 	}
 }

@@ -5,7 +5,6 @@ import (
 )
 
 type CreateSessionRequest struct {
-	// PlayerId   string `json:"playerId" validate:"required,min=1"`
 	OpponentId string `json:"opponentId" validate:"required,min=1"`
 }
 
@@ -19,16 +18,9 @@ type GetSessionResponse struct {
 }
 
 type PreparePlayerRequest struct {
-	// PlayerId       string   `json:"playerId"`
-	ChosenHeroList []string `json:"chosenHeroList"`
+	ChosenHeroList []string `json:"chosenHeroList" validate:"required,min=1"`
 }
 
-type PrepareSessionRequest struct {
-	PlayerId string
-}
-
-type ExecuteActionRequest struct {
-	PlayerId       string                 `json:"playerId"`
-	ActionName     string                 `json:"actionName"`
-	ActionSpecific map[string]interface{} `json:"actionSpecific"`
+type ServerTimeRequest struct {
+	LocalTime float64 `json:"localTime" validate:"required"`
 }
