@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"errors"
+	"log"
 	"strconv"
 
 	"pixeltactics.com/match/src/databases"
@@ -62,18 +63,18 @@ func (repo *SessionLogRepositoryImpl) GetSessionLogs(tx databases.BadgerTx, sess
 		if err != nil {
 			return nil, err
 		}
-		logs = append(logs, curLog)
+		logs[i] = curLog
 	}
 	return logs, nil
 }
 
 func (repo *SessionLogRepositoryImpl) AppendLog(tx databases.BadgerTx, sessionId string, obj *models.SessionLog) (*models.SessionLog, error) {
+	log.Println("APPEND LOG IS CALLED")
 	if tx == nil {
 		return nil, errors.New("transaction object is null")
 	}
 
-	var logCount int
-	err := tx.Get(LOG_COUNT+sessionId, &logCount)
+	logCount, err := repo.CountSessionLogs(tx, sessionId)
 	if err != nil {
 		return nil, err
 	}

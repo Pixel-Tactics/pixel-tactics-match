@@ -144,11 +144,26 @@ func (service *SessionServiceImpl) runSession(tx databases.BadgerTx, session *mo
 	if err != nil {
 		panic("PANIC: invalid session state")
 	}
+
+	stateLog, err := convert_utils.ObjectToMap(session.State)
+	if err != nil {
+		return err
+	}
+
 	_, err = service.SessionRepository.SaveSession(tx, session)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
+	_, err = service.LogRepository.AppendLog(tx, session.Id, &models.SessionLog{
+		Type:      "STATE_CHANGE",
+		SessionId: session.Id,
+		Data:      stateLog,
+	})
+	if err != nil {
+		return err
+	}
+
 	log.Println(session)
 	time.AfterFunc(time.Until(preparationDeadline), func() {
 		service.checkForExpire(tx, session, session.State.Id)
@@ -271,7 +286,20 @@ func (service *SessionServiceImpl) startBattle(tx databases.BadgerTx, playerId s
 		return err
 	}
 
+	stateLog, err := convert_utils.ObjectToMap(session.State)
+	if err != nil {
+		return err
+	}
+
 	_, err = service.SessionRepository.SaveSession(tx, session)
+	if err != nil {
+		return err
+	}
+	_, err = service.LogRepository.AppendLog(tx, session.Id, &models.SessionLog{
+		Type:      "STATE_CHANGE",
+		SessionId: session.Id,
+		Data:      stateLog,
+	})
 	if err != nil {
 		return err
 	}
@@ -294,7 +322,21 @@ func (service *SessionServiceImpl) checkForExpire(tx databases.BadgerTx, session
 	if err != nil {
 		return err
 	}
+
+	stateLog, err := convert_utils.ObjectToMap(session.State)
+	if err != nil {
+		return err
+	}
+
 	_, err = service.SessionRepository.SaveSession(tx, session)
+	if err != nil {
+		return err
+	}
+	_, err = service.LogRepository.AppendLog(tx, session.Id, &models.SessionLog{
+		Type:      "STATE_CHANGE",
+		SessionId: session.Id,
+		Data:      stateLog,
+	})
 	if err != nil {
 		return err
 	}
