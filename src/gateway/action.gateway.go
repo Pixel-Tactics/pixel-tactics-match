@@ -14,6 +14,7 @@ import (
 type ActionGateway interface {
 	Move(client *messages.WebSocketMessager)
 	Attack(client *messages.WebSocketMessager)
+	EndTurn(client *messages.WebSocketMessager)
 }
 
 type ActionGatewayImpl struct {
@@ -77,24 +78,19 @@ func (gateway *ActionGatewayImpl) Attack(client *messages.WebSocketMessager) {
 	// When action is executed, it will be sent back to user via event
 }
 
-// func (gateway *SessionGatewayImpl) EndTurn(client *messages.WebSocketMessager) {
-// 	playerIdInterface, ok := req.Message.Body["playerId"]
-// 	if !ok {
-// 		res.SendToClient(responses.ErrorMessage(errors.New("no player id")))
-// 		return
-// 	}
-// 	playerId, ok := playerIdInterface.(string)
-// 	if !ok {
-// 		res.SendToClient(responses.ErrorMessage(errors.New("player id must be a string")))
-// 		return
-// 	}
+func (gateway *ActionGatewayImpl) EndTurn(client *messages.WebSocketMessager) {
+	if client.ClientId == nil {
+		client.SendBack(Error(errors.New("not authenticated")))
+		return
+	}
 
-// 	err := handler.matchService.EndTurn(playerId)
-// 	if err != nil {
-// 		res.SendToClient(responses.ErrorMessage(err))
-// 		return
-// 	}
-// }
+	err := gateway.ActionService.EndTurn(*client.ClientId)
+	if err != nil {
+		client.SendBack(Error(err))
+		return
+	}
+	// When action is executed, it will be sent back to user via event
+}
 
 func NewActionGateway(
 	actionService services.ActionService,

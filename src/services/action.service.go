@@ -13,6 +13,7 @@ import (
 type ActionService interface {
 	Move(playerId string, baseHero string, directions []physics.Direction) error
 	Attack(playerId string, srcBaseHero string, dstBaseHero string) error
+	EndTurn(playerId string) error
 }
 
 type ActionServiceImpl struct {
@@ -38,15 +39,7 @@ func (service *ActionServiceImpl) Move(playerId string, baseHero string, directi
 	tx := service.TransactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
 
-	session, err := service.SessionService.GetSessionByPlayerId(tx, playerId)
-	if err != nil {
-		return err
-	}
-	if session == nil {
-		return errors.New("invalid session id")
-	}
-
-	activePlayerId, err := session.GetActivePlayer()
+	session, err := service.getSessionIfPlayerTurn(tx, playerId)
 	if err != nil {
 		return err
 	}
@@ -59,7 +52,7 @@ func (service *ActionServiceImpl) Move(playerId string, baseHero string, directi
 		return errors.New("invalid hero")
 	}
 
-	if !srcHero.CanMoveOnTurn(activePlayerId, session.CurrentTurn) {
+	if !srcHero.CanMoveOnTurn(playerId, session.CurrentTurn) {
 		return errors.New("hero cannot move")
 	}
 
@@ -127,12 +120,9 @@ func (service *ActionServiceImpl) Attack(playerId string, srcBaseHero string, ds
 	tx := service.TransactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
 
-	session, err := service.SessionService.GetSessionByPlayerId(tx, playerId)
+	session, err := service.getSessionIfPlayerTurn(tx, playerId)
 	if err != nil {
 		return err
-	}
-	if session == nil {
-		return errors.New("invalid session id")
 	}
 
 	srcHero, err := service.HeroService.GetPlayerHero(tx, session.Id, playerId, srcBaseHero)
@@ -152,12 +142,7 @@ func (service *ActionServiceImpl) Attack(playerId string, srcBaseHero string, ds
 		return errors.New("invalid destination hero")
 	}
 
-	activePlayerId, err := session.GetActivePlayer()
-	if err != nil {
-		return err
-	}
-
-	if !srcHero.CanAttackOnTurn(activePlayerId, session.CurrentTurn) {
+	if !srcHero.CanAttackOnTurn(playerId, session.CurrentTurn) {
 		return errors.New("hero cannot attack")
 	}
 
@@ -204,8 +189,49 @@ func (service *ActionServiceImpl) Attack(playerId string, srcBaseHero string, ds
 	if err != nil {
 		return err
 	}
-
 	return nil
+}
+
+func (service *ActionServiceImpl) EndTurn(playerId string) error {
+	tx := service.TransactionManager.NewReadWriteTransaction()
+	defer tx.Discard()
+
+	session, err := service.getSessionIfPlayerTurn(tx, playerId)
+	if err != nil {
+		return err
+	}
+
+	err = service.SessionService.SwapTurn(tx, session)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (service *ActionServiceImpl) getSessionIfPlayerTurn(tx databases.BadgerTx, playerId string) (*models.Session, error) {
+	session, err := service.SessionService.GetSessionByPlayerId(tx, playerId)
+	if err != nil {
+		return nil, err
+	}
+	if session == nil {
+		return nil, ErrSessionNotFound
+	}
+
+	activePlayerId, err := session.GetActivePlayer()
+	if err != nil {
+		return nil, err
+	}
+
+	if playerId != activePlayerId {
+		return nil, ErrNotTurn
+	}
+
+	return session, nil
 }
 
 func NewActionService(

@@ -52,7 +52,7 @@ func (session *Session) GetActivePlayer() (string, error) {
 	if session.State.Type == SessionStatePlayer1Turn {
 		return session.PlayerIds[0], nil
 	} else if session.State.Type == SessionStatePlayer2Turn {
-		return session.PlayerIds[0], nil
+		return session.PlayerIds[1], nil
 	}
 	return "", errors.New("no player is active")
 }

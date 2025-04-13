@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"errors"
-	"log"
 	"strconv"
 
 	"pixeltactics.com/match/src/databases"
@@ -69,7 +68,6 @@ func (repo *SessionLogRepositoryImpl) GetSessionLogs(tx databases.BadgerTx, sess
 }
 
 func (repo *SessionLogRepositoryImpl) AppendLog(tx databases.BadgerTx, sessionId string, obj *models.SessionLog) (*models.SessionLog, error) {
-	log.Println("APPEND LOG IS CALLED")
 	if tx == nil {
 		return nil, errors.New("transaction object is null")
 	}

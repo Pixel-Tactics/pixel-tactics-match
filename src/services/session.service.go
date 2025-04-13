@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	PreparationTime = 10 * time.Second
-	PlayerTurnTime  = 30 * time.Second
+	PreparationTime = 30 * time.Second
+	PlayerTurnTime  = 120 * time.Second
 )
 
 type SessionService interface {
@@ -33,6 +33,8 @@ type SessionService interface {
 	CreateSession(playerId string, opponentId string) (*models.Session, error)
 
 	PreparePlayer(playerId string, chosenHeroes []heroes.BaseHeroEnum) (bool, error)
+
+	SwapTurn(tx databases.BadgerTx, session *models.Session) error
 
 	EndSession(tx databases.BadgerTx, session *models.Session, winnerId *string) error
 
@@ -169,7 +171,17 @@ func (service *SessionServiceImpl) runSession(tx databases.BadgerTx, session *mo
 
 	log.Println(session)
 	time.AfterFunc(time.Until(preparationDeadline), func() {
-		service.checkForExpire(tx, session, session.State.Id)
+		log.Println("Checking for expiration...")
+		for {
+			attemptErr := service.checkForExpire(session.Id, session.State.Id)
+			if attemptErr == nil {
+				break
+			}
+			log.Println("Update session error: " + attemptErr.Error())
+			log.Println("Failed to update session, retrying...")
+			time.Sleep(5 * time.Second)
+		}
+		log.Println("Expiration checked.")
 	})
 	return nil
 }
@@ -315,11 +327,32 @@ func (service *SessionServiceImpl) startBattle(tx databases.BadgerTx, playerId s
 	return nil
 }
 
-func (service *SessionServiceImpl) checkForExpire(tx databases.BadgerTx, session *models.Session, lastStateId string) error {
+func (service *SessionServiceImpl) checkForExpire(sessionId string, lastStateId string) error {
+	tx := service.TransactionManager.NewReadWriteTransaction()
+	defer tx.Discard()
+
+	session, err := service.GetSessionById(tx, sessionId)
+	if err != nil {
+		return err
+	}
+
+	log.Println(session.State)
+	log.Println("Old ID: " + lastStateId)
+
 	if session.State.Id != lastStateId {
 		return nil
 	}
-	return service.EndSession(tx, session, nil)
+
+	err = service.EndSession(tx, session, nil)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (service *SessionServiceImpl) checkPlayerSession(tx databases.BadgerTx, playerId string) error {
@@ -352,6 +385,33 @@ func (service *SessionServiceImpl) checkOpponentSession(tx databases.BadgerTx, p
 func (service *SessionServiceImpl) EndSession(tx databases.BadgerTx, session *models.Session, winnerId *string) error {
 	sessionState := service.StateFactory.Create(session)
 	err := sessionState.End(winnerId)
+	if err != nil {
+		return err
+	}
+
+	stateLog, err := convert_utils.ObjectToMap(session.State)
+	if err != nil {
+		return err
+	}
+
+	_, err = service.SessionRepository.SaveSession(tx, session)
+	if err != nil {
+		return err
+	}
+	_, err = service.LogRepository.AppendLog(tx, session.Id, &models.SessionLog{
+		Type:      "STATE_CHANGE",
+		SessionId: session.Id,
+		Data:      stateLog,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (service *SessionServiceImpl) SwapTurn(tx databases.BadgerTx, session *models.Session) error {
+	sessionState := service.StateFactory.Create(session)
+	err := sessionState.Swap(time.Now().Add(PlayerTurnTime))
 	if err != nil {
 		return err
 	}

@@ -17,10 +17,10 @@ const (
 	TYPE_AUTH           string = "AUTH"
 	TYPE_MOVE           string = "ACTION_MOVE"
 	TYPE_ATTACK         string = "ACTION_ATTACK"
+	TYPE_END_TURN       string = "ACTION_END_TURN"
 	// TYPE_ERROR          string = "ERROR_FEEDBACK"
 	// TYPE_FEEDBACK       string = "FEEDBACK"
 	// TYPE_ENEMY_ACTION   string = "ENEMY_ACTION"
-	// TYPE_END_TURN       string = "END_TURN"
 
 	// Response
 	TYPE_INVITE_SESSION string = "INVITE_SESSION"
@@ -53,6 +53,8 @@ func (router *RouterImpl) RouteMessage(client *messages.WebSocketMessager) {
 		router.ActionGateway.Move(client)
 	case TYPE_ATTACK:
 		router.ActionGateway.Attack(client)
+	case TYPE_END_TURN:
+		router.ActionGateway.EndTurn(client)
 	default:
 		client.SendBack(Error(errors.New("invalid type")))
 	}

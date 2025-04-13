@@ -139,7 +139,6 @@ func (gateway *SessionGatewayImpl) CreateSession(client *messages.WebSocketMessa
 		message := "successfully created session"
 		response, err := gateway.SessionService.CompileSession(session.Id)
 		if err != nil {
-			log.Println("BELLOW HEHE")
 			log.Println(err)
 			message = "successfully created session, but error on showing data"
 		}

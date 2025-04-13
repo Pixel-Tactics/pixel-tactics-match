@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"errors"
-	"log"
 
 	"pixeltactics.com/match/src/databases"
 	"pixeltactics.com/match/src/heroes"
@@ -43,10 +42,7 @@ func (repo *HeroRepositoryImpl) GetPlayerHeroes(tx databases.BadgerTx, sessionId
 	ret := make([]*models.Hero, 0)
 	for _, base := range bases {
 		var hero models.Hero
-		log.Println("GET KEY:")
-		log.Println(BASE_HERO_PREFIX + sessionId + "_" + playerId + "_" + base)
 		err := query.Get(BASE_HERO_PREFIX+sessionId+"_"+playerId+"_"+base, &hero)
-		log.Println(err)
 		if err != nil && err == databases.NotFoundException() {
 			return nil, errors.New("hero " + base + " of " + playerId + " not found")
 		}
@@ -76,8 +72,6 @@ func (repo *HeroRepositoryImpl) GetHeroBySessionId(tx databases.BadgerTx, params
 func (repo *HeroRepositoryImpl) SaveHero(tx databases.BadgerTx, obj *models.Hero) (*models.Hero, error) {
 	query := databases.GetQuery(tx, repo.badger)
 
-	log.Println("SAVE KEY:")
-	log.Println(BASE_HERO_PREFIX + obj.SessionId + "_" + obj.PlayerId + "_" + obj.BaseHero)
 	err := query.Set(BASE_HERO_PREFIX+obj.SessionId+"_"+obj.PlayerId+"_"+obj.BaseHero, obj)
 	if err != nil {
 		return nil, err
