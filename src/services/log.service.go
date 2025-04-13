@@ -21,6 +21,7 @@ type LogAddedEvent struct {
 	SessionId string
 	PlayerIDs []string
 	Log       *models.SessionLog
+	LogCount  int
 }
 
 type LogServiceImpl struct {
@@ -46,6 +47,7 @@ func (service *LogServiceImpl) AppendLog(tx databases.BadgerTx, session *models.
 		SessionId: session.Id,
 		PlayerIDs: session.PlayerIds,
 		Log:       obj,
+		LogCount:  logCount,
 	}
 	return service.EventManager.Emit(LOG_ADDED_EVENT, event)
 }
