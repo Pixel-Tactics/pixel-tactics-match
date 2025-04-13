@@ -46,7 +46,7 @@ type SessionServiceImpl struct {
 	HeroService       HeroService
 	PlayerService     PlayerService
 	SessionRepository repositories.SessionRepositoryV2
-	LogRepository     repositories.SessionLogRepository
+	LogService        LogService
 
 	StateFactory       states.SessionStateFactory
 	TransactionManager databases.TransactionManager
@@ -160,7 +160,7 @@ func (service *SessionServiceImpl) runSession(tx databases.BadgerTx, session *mo
 		log.Println(err)
 		return err
 	}
-	_, err = service.LogRepository.AppendLog(tx, session.Id, &models.SessionLog{
+	err = service.LogService.AppendLog(tx, session, &models.SessionLog{
 		Type:      "STATE_CHANGE",
 		SessionId: session.Id,
 		Data:      stateLog,
@@ -310,7 +310,7 @@ func (service *SessionServiceImpl) startBattle(tx databases.BadgerTx, playerId s
 	if err != nil {
 		return err
 	}
-	_, err = service.LogRepository.AppendLog(tx, session.Id, &models.SessionLog{
+	err = service.LogService.AppendLog(tx, session, &models.SessionLog{
 		Type:      "STATE_CHANGE",
 		SessionId: session.Id,
 		Data:      stateLog,
@@ -398,7 +398,7 @@ func (service *SessionServiceImpl) EndSession(tx databases.BadgerTx, session *mo
 	if err != nil {
 		return err
 	}
-	_, err = service.LogRepository.AppendLog(tx, session.Id, &models.SessionLog{
+	err = service.LogService.AppendLog(tx, session, &models.SessionLog{
 		Type:      "STATE_CHANGE",
 		SessionId: session.Id,
 		Data:      stateLog,
@@ -425,7 +425,7 @@ func (service *SessionServiceImpl) SwapTurn(tx databases.BadgerTx, session *mode
 	if err != nil {
 		return err
 	}
-	_, err = service.LogRepository.AppendLog(tx, session.Id, &models.SessionLog{
+	err = service.LogService.AppendLog(tx, session, &models.SessionLog{
 		Type:      "STATE_CHANGE",
 		SessionId: session.Id,
 		Data:      stateLog,
@@ -470,7 +470,7 @@ func (service *SessionServiceImpl) CompileSession(sessionId string) (map[string]
 		return nil, err
 	}
 
-	logs, err := service.LogRepository.GetSessionLogs(nil, sessionId)
+	logs, err := service.LogService.GetSessionLogs(nil, sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -499,7 +499,7 @@ func NewSessionService(
 	sessionRepository repositories.SessionRepositoryV2,
 	stateFactory states.SessionStateFactory,
 	transactionManager databases.TransactionManager,
-	logRepository repositories.SessionLogRepository,
+	logService LogService,
 ) SessionService {
 	return &SessionServiceImpl{
 		MapService:         mapService,
@@ -508,6 +508,6 @@ func NewSessionService(
 		SessionRepository:  sessionRepository,
 		StateFactory:       stateFactory,
 		TransactionManager: transactionManager,
-		LogRepository:      logRepository,
+		LogService:         logService,
 	}
 }

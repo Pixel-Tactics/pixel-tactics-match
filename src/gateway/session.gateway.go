@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
-	"pixeltactics.com/match/src/core/states"
 	"pixeltactics.com/match/src/dto"
 	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/messages"
@@ -20,13 +19,10 @@ type SessionGateway interface {
 	CreateSession(client *messages.WebSocketMessager)
 	PreparePlayer(client *messages.WebSocketMessager)
 	GetServerTime(client *messages.WebSocketMessager)
-
-	SetMessager(messager messages.Messager)
 }
 
 type SessionGatewayImpl struct {
 	SessionService services.SessionService
-	EventManager   events.EventManager
 	BaseGateway
 }
 
@@ -262,43 +258,15 @@ func (gateway *SessionGatewayImpl) GetServerTime(client *messages.WebSocketMessa
 	})
 }
 
-func (gateway *SessionGatewayImpl) sendStateUpdates(event interface{}) error {
-	concreteEvent, ok := event.(*states.StateUpdateEvent)
-	if !ok {
-		log.Println("invalid event on State Update Event")
-		log.Fatalln(event)
-	}
-	response, err := convert_utils.ObjectToMap(concreteEvent)
-	if err != nil {
-		log.Println("invalid event on State Update Event")
-		log.Fatalln(err)
-	}
-	for _, playerID := range concreteEvent.PlayerIDs {
-		gateway.Messager.Send(playerID, &messages.Message{
-			Type: TYPE_STATE_CHANGE,
-			Body: response,
-		})
-	}
-	return nil
-}
-
-func (gateway *SessionGatewayImpl) SetMessager(messager messages.Messager) {
-	gateway.Messager = messager
-}
-
 func NewSessionGateway(
 	sessionService services.SessionService,
 	eventManager events.EventManager,
 	validator *validator.Validate,
 ) SessionGateway {
-	gateway := &SessionGatewayImpl{
+	return &SessionGatewayImpl{
 		SessionService: sessionService,
-		EventManager:   eventManager,
 		BaseGateway: BaseGateway{
-			Messager:  nil,
 			Validator: validator,
 		},
 	}
-	eventManager.On(states.STATE_UPDATE_EVENT, gateway.sendStateUpdates)
-	return gateway
 }

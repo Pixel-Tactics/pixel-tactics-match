@@ -33,7 +33,7 @@ func (state *PreparationState) End(winnerId *string) error {
 		Id:   uuid.New().String(),
 		Type: models.SessionStateEnded,
 	}
-	// TODO: move state update event to be in channel to handle kafka fails
+	// TODO: move state update event to be in channel to handle kafka fails, maybe remove from here and let log service handle it
 	return sendStateUpdateEvent(state.EventManager, state.Session)
 }
 

@@ -83,7 +83,7 @@ func (service *ActionServiceImpl) Move(playerId string, baseHero string, directi
 		return err
 	}
 
-	err = service.LogService.AppendLog(tx, session.Id, &models.SessionLog{
+	err = service.LogService.AppendLog(tx, session, &models.SessionLog{
 		Type:      "MOVE",
 		SessionId: session.Id,
 		Data:      logObj,
@@ -171,7 +171,7 @@ func (service *ActionServiceImpl) Attack(playerId string, srcBaseHero string, ds
 		return err
 	}
 
-	err = service.LogService.AppendLog(tx, session.Id, &models.SessionLog{
+	err = service.LogService.AppendLog(tx, session, &models.SessionLog{
 		Type:      "DAMAGE",
 		SessionId: session.Id,
 		Data:      logObj,

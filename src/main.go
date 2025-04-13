@@ -43,7 +43,7 @@ func main() {
 	heroService := services.NewHeroService(heroRepo, nil, nil, heroFactory, badger)
 	playerService := services.NewPlayerService(playerRepo, nil)
 	logService := services.NewLogService(logRepo, eventManager)
-	sessionService := services.NewSessionService(mapService, heroService, playerService, sessionRepo, stateFactory, badger, logRepo)
+	sessionService := services.NewSessionService(mapService, heroService, playerService, sessionRepo, stateFactory, badger, logService)
 	actionService := services.NewActionService(mapService, heroService, sessionService, logService, badger)
 
 	mapService.SetHeroService(heroService)
@@ -54,10 +54,11 @@ func main() {
 	authGateway := gateway.NewAuthGateway(authService, validator)
 	sessionGateway := gateway.NewSessionGateway(sessionService, eventManager, validator)
 	actionGateway := gateway.NewActionGateway(actionService, validator)
+	logGateway := gateway.NewLogGateway(logService, eventManager, validator)
 	gatewayRouter := gateway.NewRouter(authGateway, sessionGateway, actionGateway)
 	clientHub := websockets.NewClientHub(gatewayRouter)
 
-	sessionGateway.SetMessager(clientHub)
+	logGateway.SetMessager(clientHub)
 
 	go clientHub.Run()
 

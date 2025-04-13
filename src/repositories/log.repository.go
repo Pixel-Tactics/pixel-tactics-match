@@ -21,7 +21,7 @@ type SessionLogRepository interface {
 	// If session id doesn't have log, then empty log will be returned.
 	GetSessionLogs(tx databases.BadgerTx, sessionId string) ([]*models.SessionLog, error)
 
-	AppendLog(tx databases.BadgerTx, sessionId string, obj *models.SessionLog) (*models.SessionLog, error)
+	AppendLog(tx databases.BadgerTx, sessionId string, obj *models.SessionLog) (*models.SessionLog, int, error)
 }
 
 type SessionLogRepositoryImpl struct {
@@ -67,26 +67,26 @@ func (repo *SessionLogRepositoryImpl) GetSessionLogs(tx databases.BadgerTx, sess
 	return logs, nil
 }
 
-func (repo *SessionLogRepositoryImpl) AppendLog(tx databases.BadgerTx, sessionId string, obj *models.SessionLog) (*models.SessionLog, error) {
+func (repo *SessionLogRepositoryImpl) AppendLog(tx databases.BadgerTx, sessionId string, obj *models.SessionLog) (*models.SessionLog, int, error) {
 	if tx == nil {
-		return nil, errors.New("transaction object is null")
+		return nil, 0, errors.New("transaction object is null")
 	}
 
 	logCount, err := repo.CountSessionLogs(tx, sessionId)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	err = tx.Set(LOG_DETAIL+sessionId+"_"+strconv.Itoa(logCount), obj)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	err = tx.Set(LOG_COUNT+sessionId, logCount+1)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return obj, nil
+	return obj, logCount + 1, nil
 }
 
 func NewSessionLogRepository(
