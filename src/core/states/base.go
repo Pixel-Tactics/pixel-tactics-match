@@ -1,6 +1,11 @@
 package states
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"pixeltactics.com/match/src/models"
+)
 
 type SessionState interface {
 	Start(deadline time.Time) error
@@ -8,7 +13,15 @@ type SessionState interface {
 	End(winnerId *string) error
 }
 
-// type TimedState interface {
-// 	GetDeadline() time.Time
-// 	Expire()
-// }
+type BaseSessionState struct {
+	Session *models.Session
+}
+
+func (state *BaseSessionState) End(winnerId *string) error {
+	state.Session.WinnerId = winnerId
+	state.Session.State = models.State{
+		Id:   uuid.New().String(),
+		Type: models.SessionStateEnded,
+	}
+	return nil
+}

@@ -9,7 +9,7 @@ import (
 )
 
 type PlayerTurnState struct {
-	Session *models.Session
+	*BaseSessionState
 }
 
 func (state *PlayerTurnState) Start(deadline time.Time) error {
@@ -34,12 +34,24 @@ func (state *PlayerTurnState) Swap(deadline time.Time) error {
 	return nil
 }
 
-func (state *PlayerTurnState) End(winnerId *string) error {
-	return exceptions.ActionNotAllowed()
+func (state *PlayerTurnState) GetActivePlayerID() string {
+	if state.Session.State.Type == models.SessionStatePlayer1Turn {
+		return state.Session.PlayerIds[0]
+	}
+	return state.Session.PlayerIds[1]
 }
 
-func NewPlayerTurnState(session *models.Session) *PlayerTurnState {
+func (state *PlayerTurnState) GetInactivePlayerID() string {
+	if state.Session.State.Type == models.SessionStatePlayer1Turn {
+		return state.Session.PlayerIds[1]
+	}
+	return state.Session.PlayerIds[0]
+}
+
+func NewPlayerTurnState(session *models.Session) SessionState {
 	return &PlayerTurnState{
-		Session: session,
+		BaseSessionState: &BaseSessionState{
+			Session: session,
+		},
 	}
 }

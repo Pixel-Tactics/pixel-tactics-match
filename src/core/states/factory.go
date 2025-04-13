@@ -16,7 +16,7 @@ func (factory *SessionStateFactoryImpl) Create(session *models.Session) SessionS
 	} else if session.State.Type == models.SessionStatePlayer1Turn || session.State.Type == models.SessionStatePlayer2Turn {
 		return NewPlayerTurnState(session)
 	} else if session.State.Type == models.SessionStateEnded {
-		return NewEndState()
+		return NewEndState(session)
 	} else {
 		return NewMatchmakingState(session)
 	}

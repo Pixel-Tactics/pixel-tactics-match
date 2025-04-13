@@ -9,7 +9,7 @@ import (
 )
 
 type PreparationState struct {
-	Session *models.Session
+	*BaseSessionState
 }
 
 func (state *PreparationState) Start(deadline time.Time) error {
@@ -25,17 +25,10 @@ func (state *PreparationState) Swap(deadline time.Time) error {
 	return exceptions.ActionNotAllowed()
 }
 
-func (state *PreparationState) End(winnerId *string) error {
-	state.Session.WinnerId = winnerId
-	state.Session.State = models.State{
-		Id:   uuid.New().String(),
-		Type: models.SessionStateEnded,
-	}
-	return nil
-}
-
-func NewPreparationState(session *models.Session) *PreparationState {
+func NewPreparationState(session *models.Session) SessionState {
 	return &PreparationState{
-		Session: session,
+		BaseSessionState: &BaseSessionState{
+			Session: session,
+		},
 	}
 }

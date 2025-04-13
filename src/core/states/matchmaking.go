@@ -10,7 +10,7 @@ import (
 )
 
 type MatchmakingState struct {
-	Session *models.Session
+	*BaseSessionState
 }
 
 func (state *MatchmakingState) Start(deadline time.Time) error {
@@ -31,8 +31,10 @@ func (state *MatchmakingState) End(winnerId *string) error {
 	return exceptions.ActionNotAllowed()
 }
 
-func NewMatchmakingState(session *models.Session) *MatchmakingState {
+func NewMatchmakingState(session *models.Session) SessionState {
 	return &MatchmakingState{
-		Session: session,
+		BaseSessionState: &BaseSessionState{
+			Session: session,
+		},
 	}
 }

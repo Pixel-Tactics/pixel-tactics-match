@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	PreparationTime = 30 * time.Second
-	PlayerTurnTime  = 120 * time.Second
+	PreparationTime = 10 * time.Second
+	PlayerTurnTime  = 20 * time.Second
 )
 
 type SessionService interface {
@@ -149,41 +149,7 @@ func (service *SessionServiceImpl) runSession(tx databases.BadgerTx, session *mo
 	if err != nil {
 		panic("PANIC: invalid session state")
 	}
-
-	stateLog, err := convert_utils.ObjectToMap(session.State)
-	if err != nil {
-		return err
-	}
-
-	_, err = service.SessionRepository.SaveSession(tx, session)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	err = service.LogService.AppendLog(tx, session, &models.SessionLog{
-		Type:      "STATE_CHANGE",
-		SessionId: session.Id,
-		Data:      stateLog,
-	})
-	if err != nil {
-		return err
-	}
-
-	log.Println(session)
-	time.AfterFunc(time.Until(preparationDeadline), func() {
-		log.Println("Checking for expiration...")
-		for {
-			attemptErr := service.checkForExpire(session.Id, session.State.Id)
-			if attemptErr == nil {
-				break
-			}
-			log.Println("Update session error: " + attemptErr.Error())
-			log.Println("Failed to update session, retrying...")
-			time.Sleep(5 * time.Second)
-		}
-		log.Println("Expiration checked.")
-	})
-	return nil
+	return service.applyStateChange(tx, session)
 }
 
 // Chooses heroes for player. It returns boolean that represents whether the preparation ends (other player have chosen their heroes too) or not.
@@ -305,20 +271,7 @@ func (service *SessionServiceImpl) startBattle(tx databases.BadgerTx, playerId s
 		return err
 	}
 
-	stateLog, err := convert_utils.ObjectToMap(session.State)
-	if err != nil {
-		return err
-	}
-
-	_, err = service.SessionRepository.SaveSession(tx, session)
-	if err != nil {
-		return err
-	}
-	err = service.LogService.AppendLog(tx, session, &models.SessionLog{
-		Type:      "STATE_CHANGE",
-		SessionId: session.Id,
-		Data:      stateLog,
-	})
+	err = service.applyStateChange(tx, session)
 	if err != nil {
 		return err
 	}
@@ -347,11 +300,20 @@ func (service *SessionServiceImpl) checkForExpire(sessionId string, lastStateId 
 		return nil
 	}
 
-	err = service.EndSession(tx, session, nil)
+	var winnerId *string = nil
+	sessionState := service.StateFactory.Create(session)
+	turnState, ok := sessionState.(*states.PlayerTurnState)
+	if ok {
+		winnerStr := turnState.GetInactivePlayerID()
+		winnerId = &winnerStr
+	}
+
+	err = service.EndSession(tx, session, winnerId)
 	if err != nil {
 		return err
 	}
 
+	log.Println("Committing expiration...")
 	err = tx.Commit()
 	if err != nil {
 		return err
@@ -388,29 +350,12 @@ func (service *SessionServiceImpl) checkOpponentSession(tx databases.BadgerTx, p
 
 func (service *SessionServiceImpl) EndSession(tx databases.BadgerTx, session *models.Session, winnerId *string) error {
 	sessionState := service.StateFactory.Create(session)
+	log.Println("Ending session...")
 	err := sessionState.End(winnerId)
 	if err != nil {
 		return err
 	}
-
-	stateLog, err := convert_utils.ObjectToMap(session.State)
-	if err != nil {
-		return err
-	}
-
-	_, err = service.SessionRepository.SaveSession(tx, session)
-	if err != nil {
-		return err
-	}
-	err = service.LogService.AppendLog(tx, session, &models.SessionLog{
-		Type:      "STATE_CHANGE",
-		SessionId: session.Id,
-		Data:      stateLog,
-	})
-	if err != nil {
-		return err
-	}
-	return nil
+	return service.applyStateChange(tx, session)
 }
 
 func (service *SessionServiceImpl) SwapTurn(tx databases.BadgerTx, session *models.Session) error {
@@ -419,16 +364,24 @@ func (service *SessionServiceImpl) SwapTurn(tx databases.BadgerTx, session *mode
 	if err != nil {
 		return err
 	}
+	return service.applyStateChange(tx, session)
+}
 
+func (service *SessionServiceImpl) applyStateChange(tx databases.BadgerTx, session *models.Session) error {
 	stateLog, err := convert_utils.ObjectToMap(session.State)
 	if err != nil {
 		return err
 	}
+	if session.State.Type == models.SessionStateEnded {
+		stateLog["winnerId"] = session.WinnerId
+	}
 
 	_, err = service.SessionRepository.SaveSession(tx, session)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
+	log.Println("Sending log...")
 	err = service.LogService.AppendLog(tx, session, &models.SessionLog{
 		Type:      "STATE_CHANGE",
 		SessionId: session.Id,
@@ -437,12 +390,24 @@ func (service *SessionServiceImpl) SwapTurn(tx databases.BadgerTx, session *mode
 	if err != nil {
 		return err
 	}
+
+	if !session.State.Deadline.IsZero() {
+		log.Println("Setting expiration...")
+		time.AfterFunc(time.Until(session.State.Deadline), func() {
+			log.Println("Checking for expiration...")
+			for {
+				attemptErr := service.checkForExpire(session.Id, session.State.Id)
+				if attemptErr == nil {
+					break
+				}
+				log.Println("Update session error: " + attemptErr.Error())
+				log.Println("Failed to update session, retrying...")
+				time.Sleep(5 * time.Second)
+			}
+		})
+	}
 	return nil
 }
-
-// func (service *SessionServiceImpl) CheckForStateChange(session *models.Session) {
-
-// }
 
 func (service *SessionServiceImpl) CompileSession(sessionId string) (map[string]interface{}, error) {
 	session, err := service.GetSessionById(nil, sessionId)
