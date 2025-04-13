@@ -52,10 +52,13 @@ func main() {
 	heroService.SetPlayerService(playerService)
 
 	authGateway := gateway.NewAuthGateway(authService, validator)
-	sessionGateway := gateway.NewSessionGateway(sessionService, validator)
+	sessionGateway := gateway.NewSessionGateway(sessionService, eventManager, validator)
 	actionGateway := gateway.NewActionGateway(actionService, validator)
 	gatewayRouter := gateway.NewRouter(authGateway, sessionGateway, actionGateway)
 	clientHub := websockets.NewClientHub(gatewayRouter)
+
+	sessionGateway.SetMessager(clientHub)
+
 	go clientHub.Run()
 
 	router := gin.Default()

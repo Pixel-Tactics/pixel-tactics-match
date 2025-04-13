@@ -32,7 +32,7 @@ func (state *PlayerTurnState) Swap(deadline time.Time) error {
 			Deadline: deadline,
 		}
 	}
-	return sendStateUpdateEvent(state.EventManager, state.Session.Id, state.Session.State)
+	return sendStateUpdateEvent(state.EventManager, state.Session)
 }
 
 func (state *PlayerTurnState) End(winnerId *string) error {

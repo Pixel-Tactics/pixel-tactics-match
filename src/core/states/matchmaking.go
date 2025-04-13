@@ -22,7 +22,7 @@ func (state *MatchmakingState) Start(deadline time.Time) error {
 		Type:     models.SessionStatePreparation,
 		Deadline: deadline,
 	}
-	return sendStateUpdateEvent(state.EventManager, state.Session.Id, state.Session.State)
+	return nil
 }
 
 func (state *MatchmakingState) Swap(deadline time.Time) error {

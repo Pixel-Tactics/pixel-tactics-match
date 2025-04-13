@@ -9,8 +9,11 @@ import (
 
 type Messager interface {
 	Send(clientId string, message *Message)
+}
+
+type ClientMessager interface {
 	SendBack(message *Message)
-	SetClientId(clientId string)
+	Messager
 }
 
 type WebSocketMessager struct {

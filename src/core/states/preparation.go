@@ -20,8 +20,7 @@ func (state *PreparationState) Start(deadline time.Time) error {
 		Type:     models.SessionStatePlayer1Turn,
 		Deadline: deadline,
 	}
-	// TODO: move state update event to be in channel to handle kafka fails
-	return sendStateUpdateEvent(state.EventManager, state.Session.Id, state.Session.State)
+	return nil
 }
 
 func (state *PreparationState) Swap(deadline time.Time) error {
@@ -34,7 +33,8 @@ func (state *PreparationState) End(winnerId *string) error {
 		Id:   uuid.New().String(),
 		Type: models.SessionStateEnded,
 	}
-	return sendStateUpdateEvent(state.EventManager, state.Session.Id, state.Session.State)
+	// TODO: move state update event to be in channel to handle kafka fails
+	return sendStateUpdateEvent(state.EventManager, state.Session)
 }
 
 func NewPreparationState(session *models.Session, eventManager events.EventManager) *PreparationState {

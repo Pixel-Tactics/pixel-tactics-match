@@ -76,11 +76,11 @@ func (hub *ClientHub) unregisterClient(client *Client) {
 	}
 }
 
-func (hub *ClientHub) SendMessageToUser(userId string, msg *messages.Message) {
-	msg.Identifier = "notification"
-	otherClient, ok := hub.GetClientFromUserId(userId)
+func (hub *ClientHub) Send(clientId string, message *messages.Message) {
+	message.Identifier = "notification"
+	otherClient, ok := hub.GetClientFromUserId(clientId)
 	if ok {
-		otherClient.Receive <- msg
+		otherClient.Receive <- message
 	}
 }
 

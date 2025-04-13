@@ -3,14 +3,20 @@ package states
 import (
 	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/models"
-	convert_utils "pixeltactics.com/match/src/utils/convert"
 )
 
-func sendStateUpdateEvent(manager events.EventManager, sessionId string, obj models.State) error {
-	mapObj, err := convert_utils.ObjectToMap(obj)
-	if err != nil {
-		return err
-	}
-	mapObj["sessionId"] = sessionId
-	return manager.Emit("session_state_update", mapObj)
+const STATE_UPDATE_EVENT = "session_state_update"
+
+type StateUpdateEvent struct {
+	SessionId string
+	PlayerIDs []string
+	NewState  models.State
+}
+
+func sendStateUpdateEvent(manager events.EventManager, session *models.Session) error {
+	return manager.Emit(STATE_UPDATE_EVENT, &StateUpdateEvent{
+		SessionId: session.Id,
+		PlayerIDs: session.PlayerIds,
+		NewState:  session.State,
+	})
 }

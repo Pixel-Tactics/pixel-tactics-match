@@ -26,6 +26,7 @@ const (
 	TYPE_INVITE_SESSION string = "INVITE_SESSION"
 	TYPE_START_SESSION  string = "START_SESSION"
 	TYPE_START_BATTLE   string = "START_BATTLE"
+	TYPE_STATE_CHANGE   string = "STATE_CHANGE"
 )
 
 type Router interface {
