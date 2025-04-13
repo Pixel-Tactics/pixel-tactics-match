@@ -30,6 +30,7 @@ func (state *PlayerTurnState) Swap(deadline time.Time) error {
 			Deadline: deadline,
 		}
 	}
+	state.Session.CurrentTurn += 1
 	return nil
 }
 
