@@ -4,14 +4,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/exceptions"
 	"pixeltactics.com/match/src/models"
 )
 
 type PreparationState struct {
-	Session      *models.Session
-	EventManager events.EventManager
+	Session *models.Session
 }
 
 func (state *PreparationState) Start(deadline time.Time) error {
@@ -33,13 +31,11 @@ func (state *PreparationState) End(winnerId *string) error {
 		Id:   uuid.New().String(),
 		Type: models.SessionStateEnded,
 	}
-	// TODO: move state update event to be in channel to handle kafka fails, maybe remove from here and let log service handle it
-	return sendStateUpdateEvent(state.EventManager, state.Session)
+	return nil
 }
 
-func NewPreparationState(session *models.Session, eventManager events.EventManager) *PreparationState {
+func NewPreparationState(session *models.Session) *PreparationState {
 	return &PreparationState{
-		Session:      session,
-		EventManager: eventManager,
+		Session: session,
 	}
 }

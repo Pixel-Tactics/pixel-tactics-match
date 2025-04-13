@@ -1,7 +1,6 @@
 package states
 
 import (
-	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/models"
 )
 
@@ -9,24 +8,20 @@ type SessionStateFactory interface {
 	Create(session *models.Session) SessionState
 }
 
-type SessionStateFactoryImpl struct {
-	EventManager events.EventManager
-}
+type SessionStateFactoryImpl struct{}
 
 func (factory *SessionStateFactoryImpl) Create(session *models.Session) SessionState {
 	if session.State.Type == models.SessionStatePreparation {
-		return NewPreparationState(session, factory.EventManager)
+		return NewPreparationState(session)
 	} else if session.State.Type == models.SessionStatePlayer1Turn || session.State.Type == models.SessionStatePlayer2Turn {
-		return NewPlayerTurnState(session, factory.EventManager)
+		return NewPlayerTurnState(session)
 	} else if session.State.Type == models.SessionStateEnded {
-		return NewEndState(factory.EventManager)
+		return NewEndState()
 	} else {
-		return NewMatchmakingState(session, factory.EventManager)
+		return NewMatchmakingState(session)
 	}
 }
 
-func NewSessionStateFactory(eventManager events.EventManager) SessionStateFactory {
-	return &SessionStateFactoryImpl{
-		EventManager: eventManager,
-	}
+func NewSessionStateFactory() SessionStateFactory {
+	return &SessionStateFactoryImpl{}
 }

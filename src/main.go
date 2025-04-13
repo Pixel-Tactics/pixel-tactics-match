@@ -30,7 +30,7 @@ func main() {
 
 	heroFactory := heroes.NewBaseHeroFactory()
 	eventManager := events.NewSequentialEventManager()
-	stateFactory := states.NewSessionStateFactory(eventManager)
+	stateFactory := states.NewSessionStateFactory()
 
 	mapRepo := repositories.NewMapRepository(badger)
 	heroRepo := repositories.NewHeroRepository(badger)

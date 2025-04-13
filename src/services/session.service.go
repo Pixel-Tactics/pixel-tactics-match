@@ -258,19 +258,23 @@ func (service *SessionServiceImpl) startBattle(tx databases.BadgerTx, playerId s
 	var heroList2 []*models.Hero
 	if playerId == session.PlayerIds[0] {
 		heroList1 = playerHeroList
-		heroList2, err := service.HeroService.GetPlayerHeroes(tx, session.Id, player2.Id)
+		heroList2, err = service.HeroService.GetPlayerHeroes(tx, session.Id, player2.Id)
 		if err != nil || len(heroList2) == 0 {
 			log.Println("Cannot start match yet (" + err.Error() + ")..")
 			return exceptions.HeroPickupError()
 		}
 	} else {
-		heroList1, err := service.HeroService.GetPlayerHeroes(tx, session.Id, player1.Id)
+		heroList1, err = service.HeroService.GetPlayerHeroes(tx, session.Id, player1.Id)
 		heroList2 = playerHeroList
 		if err != nil || len(heroList1) == 0 {
 			log.Println("Cannot start match yet (" + err.Error() + ")..")
 			return exceptions.HeroPickupError()
 		}
 	}
+
+	log.Println("Before map..")
+	log.Println(heroList1)
+	log.Println(heroList2)
 
 	sessionMap, err := service.MapService.GetSessionMap(tx, session.Id)
 	if err != nil {
@@ -290,7 +294,7 @@ func (service *SessionServiceImpl) startBattle(tx databases.BadgerTx, playerId s
 		}
 	}
 
-	err = service.HeroService.InitHeroPositionTx(tx, heroList1, spawnPoints1, heroList2, spawnPoints2)
+	err = service.HeroService.InitHeroPosition(tx, heroList1, spawnPoints1, heroList2, spawnPoints2)
 	if err != nil {
 		return err
 	}

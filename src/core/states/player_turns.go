@@ -4,14 +4,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/exceptions"
 	"pixeltactics.com/match/src/models"
 )
 
 type PlayerTurnState struct {
-	Session      *models.Session
-	EventManager events.EventManager
+	Session *models.Session
 }
 
 func (state *PlayerTurnState) Start(deadline time.Time) error {
@@ -32,16 +30,15 @@ func (state *PlayerTurnState) Swap(deadline time.Time) error {
 			Deadline: deadline,
 		}
 	}
-	return sendStateUpdateEvent(state.EventManager, state.Session)
+	return nil
 }
 
 func (state *PlayerTurnState) End(winnerId *string) error {
 	return exceptions.ActionNotAllowed()
 }
 
-func NewPlayerTurnState(session *models.Session, eventManager events.EventManager) *PlayerTurnState {
+func NewPlayerTurnState(session *models.Session) *PlayerTurnState {
 	return &PlayerTurnState{
-		Session:      session,
-		EventManager: eventManager,
+		Session: session,
 	}
 }

@@ -5,14 +5,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/exceptions"
 	"pixeltactics.com/match/src/models"
 )
 
 type MatchmakingState struct {
-	Session      *models.Session
-	EventManager events.EventManager
+	Session *models.Session
 }
 
 func (state *MatchmakingState) Start(deadline time.Time) error {
@@ -33,9 +31,8 @@ func (state *MatchmakingState) End(winnerId *string) error {
 	return exceptions.ActionNotAllowed()
 }
 
-func NewMatchmakingState(session *models.Session, eventManager events.EventManager) *MatchmakingState {
+func NewMatchmakingState(session *models.Session) *MatchmakingState {
 	return &MatchmakingState{
-		Session:      session,
-		EventManager: eventManager,
+		Session: session,
 	}
 }

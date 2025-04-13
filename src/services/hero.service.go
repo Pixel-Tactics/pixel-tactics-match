@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"log"
 
 	"pixeltactics.com/match/src/databases"
 	"pixeltactics.com/match/src/exceptions"
@@ -28,8 +29,7 @@ type HeroService interface {
 
 	// Sets heroes for specific player. The chosen heroes must be valid in terms of number, availability, and duplication.
 	CreateHeroes(tx databases.BadgerTx, sessionId string, playerId string, chosen []heroes.BaseHeroEnum) ([]*models.Hero, error)
-	InitHeroPosition(heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
-	InitHeroPositionTx(tx databases.BadgerTx, heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
+	InitHeroPosition(tx databases.BadgerTx, heroList1 []*models.Hero, spawnPoints1 []physics.Point, heroList2 []*models.Hero, spawnPoints2 []physics.Point) error
 	GetInitialState(tx databases.BadgerTx, heroList1 []*models.Hero, heroList2 []*models.Hero) ([]*models.Hero, []*models.Hero, error)
 
 	ApplyDamage(tx databases.BadgerTx, currentTurn int, srcHero *models.Hero, trgHero *models.Hero, damage int) error
@@ -168,13 +168,18 @@ func (service *HeroServiceImpl) CreateHeroes(tx databases.BadgerTx, sessionId st
 	return heroList, nil
 }
 
-func (service *HeroServiceImpl) InitHeroPositionTx(
+func (service *HeroServiceImpl) InitHeroPosition(
 	tx databases.BadgerTx,
 	heroList1 []*models.Hero,
 	spawnPoints1 []physics.Point,
 	heroList2 []*models.Hero,
 	spawnPoints2 []physics.Point,
 ) error {
+	log.Println("Setting up hero spawns...")
+	log.Println(heroList1)
+	log.Println(spawnPoints1)
+	log.Println(heroList2)
+	log.Println(spawnPoints2)
 
 	for i, spawnPoint := range spawnPoints1 {
 		if i < len(heroList1) {
@@ -208,27 +213,11 @@ func (service *HeroServiceImpl) InitHeroPositionTx(
 		}
 	}
 
-	return nil
-}
-
-func (service *HeroServiceImpl) InitHeroPosition(
-	heroList1 []*models.Hero,
-	spawnPoints1 []physics.Point,
-	heroList2 []*models.Hero,
-	spawnPoints2 []physics.Point,
-) error {
-	tx := service.TransactionManager.NewReadWriteTransaction()
-	defer tx.Discard()
-
-	err := service.InitHeroPositionTx(tx, heroList1, spawnPoints1, heroList2, spawnPoints2)
-	if err != nil {
-		return err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
+	log.Println("After setting up...")
+	log.Println(heroList1)
+	log.Println(spawnPoints1)
+	log.Println(heroList2)
+	log.Println(spawnPoints2)
 
 	return nil
 }
