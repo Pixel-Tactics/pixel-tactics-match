@@ -33,6 +33,9 @@ type SessionService interface {
 	CreateSession(playerId string, opponentId string) (*models.Session, error)
 
 	PreparePlayer(playerId string, chosenHeroes []heroes.BaseHeroEnum) (bool, error)
+
+	EndSession(tx databases.BadgerTx, session *models.Session, winnerId *string) error
+
 	CompileSession(sessionId string) (map[string]interface{}, error)
 }
 
@@ -316,31 +319,7 @@ func (service *SessionServiceImpl) checkForExpire(tx databases.BadgerTx, session
 	if session.State.Id != lastStateId {
 		return nil
 	}
-
-	sessionState := service.StateFactory.Create(session)
-	err := sessionState.End(nil)
-	if err != nil {
-		return err
-	}
-
-	stateLog, err := convert_utils.ObjectToMap(session.State)
-	if err != nil {
-		return err
-	}
-
-	_, err = service.SessionRepository.SaveSession(tx, session)
-	if err != nil {
-		return err
-	}
-	_, err = service.LogRepository.AppendLog(tx, session.Id, &models.SessionLog{
-		Type:      "STATE_CHANGE",
-		SessionId: session.Id,
-		Data:      stateLog,
-	})
-	if err != nil {
-		return err
-	}
-	return nil
+	return service.EndSession(tx, session, nil)
 }
 
 func (service *SessionServiceImpl) checkPlayerSession(tx databases.BadgerTx, playerId string) error {
@@ -369,6 +348,37 @@ func (service *SessionServiceImpl) checkOpponentSession(tx databases.BadgerTx, p
 	}
 	return false, nil
 }
+
+func (service *SessionServiceImpl) EndSession(tx databases.BadgerTx, session *models.Session, winnerId *string) error {
+	sessionState := service.StateFactory.Create(session)
+	err := sessionState.End(winnerId)
+	if err != nil {
+		return err
+	}
+
+	stateLog, err := convert_utils.ObjectToMap(session.State)
+	if err != nil {
+		return err
+	}
+
+	_, err = service.SessionRepository.SaveSession(tx, session)
+	if err != nil {
+		return err
+	}
+	_, err = service.LogRepository.AppendLog(tx, session.Id, &models.SessionLog{
+		Type:      "STATE_CHANGE",
+		SessionId: session.Id,
+		Data:      stateLog,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// func (service *SessionServiceImpl) CheckForStateChange(session *models.Session) {
+
+// }
 
 func (service *SessionServiceImpl) CompileSession(sessionId string) (map[string]interface{}, error) {
 	session, err := service.GetSessionById(nil, sessionId)
