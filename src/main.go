@@ -46,7 +46,7 @@ func main() {
 	logService := services.NewLogService(logRepo, eventManager)
 	sessionService := services.NewSessionService(mapService, heroService, playerService, sessionRepo, stateFactory, badger, logService, eventManager)
 	actionService := services.NewActionService(mapService, heroService, sessionService, logService, badger)
-	inviteService := services.NewInvitationService(inviteRepo, badger, sessionService)
+	inviteService := services.NewInvitationService(inviteRepo, badger, sessionService, eventManager)
 
 	mapService.SetHeroService(heroService)
 	playerService.SetSessionService(sessionService)
@@ -57,12 +57,13 @@ func main() {
 	sessionGateway := gateway.NewSessionGateway(sessionService, eventManager, validator)
 	actionGateway := gateway.NewActionGateway(actionService, validator)
 	logGateway := gateway.NewLogGateway(logService, eventManager, validator)
-	inviteGateway := gateway.NewInvitationGateway(inviteService, validator)
+	inviteGateway := gateway.NewInvitationGateway(inviteService, validator, eventManager)
 	gatewayRouter := gateway.NewRouter(authGateway, sessionGateway, actionGateway, inviteGateway)
 	clientHub := websockets.NewClientHub(gatewayRouter)
 
 	logGateway.SetMessager(clientHub)
 	sessionGateway.SetMessager(clientHub)
+	inviteGateway.SetMessager(clientHub)
 
 	go clientHub.Run()
 

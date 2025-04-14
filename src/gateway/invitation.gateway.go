@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"pixeltactics.com/match/src/dto"
+	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/messages"
 	"pixeltactics.com/match/src/services"
 	convert_utils "pixeltactics.com/match/src/utils/convert"
@@ -12,10 +13,12 @@ import (
 
 type InvitationGateway interface {
 	Invite(client *messages.WebSocketMessager)
+	HasMessager
 }
 
 type InvitationGatewayImpl struct {
 	InvitationService services.InvitationService
+	EventManager      events.EventManager
 	BaseGateway
 }
 
@@ -59,14 +62,33 @@ func (gateway *InvitationGatewayImpl) Invite(client *messages.WebSocketMessager)
 	})
 }
 
+func (gateway *InvitationGatewayImpl) NotifyInvite(data interface{}) error {
+	event, ok := data.(*services.InviteEvent)
+	if !ok {
+		log.Println("invalid event class: ")
+		panic(data)
+	}
+	gateway.Messager.Send(event.DstPlayerId, &messages.Message{
+		Type: TYPE_INVITE_SESSION,
+		Body: map[string]interface{}{
+			"playerId": event.SrcPlayerId,
+		},
+	})
+	return nil
+}
+
 func NewInvitationGateway(
 	invitationService services.InvitationService,
 	validator *validator.Validate,
+	eventManager events.EventManager,
 ) InvitationGateway {
-	return &InvitationGatewayImpl{
+	gateway := &InvitationGatewayImpl{
 		InvitationService: invitationService,
+		EventManager:      eventManager,
 		BaseGateway: BaseGateway{
 			Validator: validator,
 		},
 	}
+	gateway.EventManager.On(services.INVITE_EVENT, gateway.NotifyInvite)
+	return gateway
 }
