@@ -10,6 +10,7 @@ import (
 )
 
 const MAX_INVITATION = 5
+const INVITATION_TTL = 5 * time.Second
 
 var ErrLimitReached = errors.New("limit reached")
 var ErrAlreadyExists = errors.New("already exists")
@@ -115,11 +116,11 @@ func (repo *InvitationRepositoryImpl) SaveInvitation(tx databases.BadgerTx, play
 	}
 
 	curTime := strconv.Itoa(int(time.Now().Unix()))
-	err = tx.Set("invitation:out:"+playerId+":"+curTime+":"+opponentId, &opponentId)
+	err = tx.SetWithTTL("invitation:out:"+playerId+":"+curTime+":"+opponentId, &opponentId, INVITATION_TTL)
 	if err != nil {
 		return err
 	}
-	err = tx.Set("invitation:in:"+opponentId+":"+curTime+":"+playerId, &playerId)
+	err = tx.SetWithTTL("invitation:in:"+opponentId+":"+curTime+":"+playerId, &playerId, INVITATION_TTL)
 	if err != nil {
 		return err
 	}
