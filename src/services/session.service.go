@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"pixeltactics.com/match/src/core/states"
 	"pixeltactics.com/match/src/databases"
+	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/exceptions"
 	"pixeltactics.com/match/src/heroes"
 	"pixeltactics.com/match/src/models"
@@ -17,8 +18,9 @@ import (
 )
 
 const (
-	PreparationTime = 10 * time.Second
-	PlayerTurnTime  = 20 * time.Second
+	PreparationTime       = 10 * time.Second
+	PlayerTurnTime        = 20 * time.Second
+	SESSION_CREATED_EVENT = "SESSION_CREATED_EVENT"
 )
 
 type SessionService interface {
@@ -30,7 +32,7 @@ type SessionService interface {
 
 	// Creates session object for player and opponent. If it was empty, player invites opponent.
 	// But if the opponent already invited player, it will start the match by going into preparation state.
-	CreateSession(playerId string, opponentId string) (*models.Session, error)
+	CreateSession(tx databases.BadgerTx, playerId string, opponentId string) (*models.Session, error)
 
 	PreparePlayer(playerId string, chosenHeroes []heroes.BaseHeroEnum) (bool, error)
 
@@ -38,7 +40,12 @@ type SessionService interface {
 
 	EndSession(tx databases.BadgerTx, session *models.Session, winnerId *string) error
 
-	CompileSession(sessionId string) (map[string]interface{}, error)
+	CompileSession(tx databases.BadgerTx, sessionId string) (map[string]interface{}, error)
+}
+
+type SessionCreatedEvent struct {
+	Data      map[string]interface{}
+	PlayerIds []string
 }
 
 type SessionServiceImpl struct {
@@ -50,6 +57,7 @@ type SessionServiceImpl struct {
 
 	StateFactory       states.SessionStateFactory
 	TransactionManager databases.TransactionManager
+	EventManager       events.EventManager
 }
 
 // When no key found (or empty) for session, nil session will be returned instead of error.
@@ -62,60 +70,34 @@ func (service *SessionServiceImpl) GetSessionByPlayerId(tx databases.BadgerTx, p
 	return service.SessionRepository.GetSessionByPlayerId(tx, playerId)
 }
 
-// Creates session object for player and opponent. If it was empty, player invites opponent.
-// But if the opponent already invited player, it will start the match by going into preparation state.
-func (service *SessionServiceImpl) CreateSession(playerId string, opponentId string) (*models.Session, error) {
-	tx := service.TransactionManager.NewReadWriteTransaction()
-	defer tx.Discard()
-
-	err := service.checkPlayerSession(tx, playerId)
+func (service *SessionServiceImpl) CreateSession(tx databases.BadgerTx, playerId string, opponentId string) (*models.Session, error) {
+	err := service.isInSession(tx, playerId)
+	if err != nil {
+		return nil, err
+	}
+	err = service.isInSession(tx, opponentId)
 	if err != nil {
 		return nil, err
 	}
 
-	isStart, err := service.checkOpponentSession(tx, playerId, opponentId)
-	if err != nil {
-		return nil, err
-	}
+	// TODO: add randomizer
 
-	// Session object is already created (by opponent)
-	if isStart {
-		log.Println("STARTING...")
-		oppSession, err := service.SessionRepository.GetSessionByPlayerId(tx, opponentId)
-		if err != nil {
-			log.Fatalln(err)
-			return nil, err
-		}
-		if oppSession == nil {
-			log.Fatalln("session found before but now not")
-			return nil, errors.New("server cannot get opponent session")
-		}
-		err = service.runSession(tx, oppSession)
-		if err != nil {
-			return nil, err
-		}
-		err = tx.Commit()
-		if err != nil {
-			return nil, err
-		}
-		return oppSession, nil
-	}
-
-	// Session object is not created, so create it
-	availHeroes := service.HeroService.GetAvailableHeroes()
+	availableHeroes := service.HeroService.GetAvailableHeroes()
 	sessionId := uuid.New().String()
 	session := &models.Session{
 		Id: sessionId,
 		State: models.State{
-			Id:   uuid.New().String(),
-			Type: models.SessionStateMatchMaking,
+			Id:       uuid.New().String(),
+			Type:     models.SessionStatePreparation,
+			Deadline: time.Now().Add(PreparationTime),
 		},
-		AllowedHeroList: availHeroes,
+		AllowedHeroList: availableHeroes,
 		PlayerIds: []string{
 			playerId,
 			opponentId,
 		},
 	}
+
 	_, err = service.SessionRepository.SaveSession(tx, session)
 	if err != nil {
 		return nil, err
@@ -123,34 +105,131 @@ func (service *SessionServiceImpl) CreateSession(playerId string, opponentId str
 
 	err = service.PlayerService.CreatePlayerForSession(tx, session.Id, playerId, opponentId)
 	if err != nil {
-		service.SessionRepository.DeleteSession(tx, session.Id)
 		return nil, err
 	}
 
 	_, err = service.MapService.GenerateMap(tx, session.Id)
 	if err != nil {
-		service.SessionRepository.DeleteSession(tx, session.Id)
 		return nil, err
 	}
 
-	err = tx.Commit()
+	compiled, err := service.CompileSession(tx, session.Id)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: use channels in case of failures
+	err = service.EventManager.Emit(SESSION_CREATED_EVENT, &SessionCreatedEvent{
+		Data:      compiled,
+		PlayerIds: session.PlayerIds,
+	})
 	if err != nil {
 		return nil, err
 	}
 
+	time.AfterFunc(time.Until(session.State.Deadline), func() {
+		log.Println("Checking for expiration...")
+		for {
+			attemptErr := service.checkForExpire(session.Id, session.State.Id)
+			if attemptErr == nil {
+				break
+			}
+			log.Println("Update session error: " + attemptErr.Error())
+			log.Println("Failed to update session, retrying...")
+			time.Sleep(5 * time.Second)
+		}
+	})
 	return session, nil
 }
 
-// Start the preparation state
-func (service *SessionServiceImpl) runSession(tx databases.BadgerTx, session *models.Session) error {
-	preparationDeadline := time.Now().Add(PreparationTime)
-	sessionState := service.StateFactory.Create(session)
-	err := sessionState.Start(preparationDeadline)
-	if err != nil {
-		panic("PANIC: invalid session state")
-	}
-	return service.applyStateChange(tx, session)
-}
+// Creates session object for player and opponent. If it was empty, player invites opponent.
+// // But if the opponent already invited player, it will start the match by going into preparation state.
+// func (service *SessionServiceImpl) CreateSession(playerId string, opponentId string) (*models.Session, error) {
+// 	tx := service.TransactionManager.NewReadWriteTransaction()
+// 	defer tx.Discard()
+
+// 	err := service.checkPlayerSession(tx, playerId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	isStart, err := service.checkOpponentSession(tx, playerId, opponentId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	// Session object is already created (by opponent)
+// 	if isStart {
+// 		log.Println("STARTING...")
+// 		oppSession, err := service.SessionRepository.GetSessionByPlayerId(tx, opponentId)
+// 		if err != nil {
+// 			log.Fatalln(err)
+// 			return nil, err
+// 		}
+// 		if oppSession == nil {
+// 			log.Fatalln("session found before but now not")
+// 			return nil, errors.New("server cannot get opponent session")
+// 		}
+// 		err = service.runSession(tx, oppSession)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		err = tx.Commit()
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		return oppSession, nil
+// 	}
+
+// 	// Session object is not created, so create it
+// 	availHeroes := service.HeroService.GetAvailableHeroes()
+// 	sessionId := uuid.New().String()
+// 	session := &models.Session{
+// 		Id: sessionId,
+// 		State: models.State{
+// 			Id:   uuid.New().String(),
+// 			Type: models.SessionStateMatchMaking,
+// 		},
+// 		AllowedHeroList: availHeroes,
+// 		PlayerIds: []string{
+// 			playerId,
+// 			opponentId,
+// 		},
+// 	}
+// 	_, err = service.SessionRepository.SaveSession(tx, session)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	err = service.PlayerService.CreatePlayerForSession(tx, session.Id, playerId, opponentId)
+// 	if err != nil {
+// 		service.SessionRepository.DeleteSession(tx, session.Id)
+// 		return nil, err
+// 	}
+
+// 	_, err = service.MapService.GenerateMap(tx, session.Id)
+// 	if err != nil {
+// 		service.SessionRepository.DeleteSession(tx, session.Id)
+// 		return nil, err
+// 	}
+
+// 	err = tx.Commit()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return session, nil
+// }
+
+// // Start the preparation state
+// func (service *SessionServiceImpl) runSession(tx databases.BadgerTx, session *models.Session) error {
+// 	preparationDeadline := time.Now().Add(PreparationTime)
+// 	sessionState := service.StateFactory.Create(session)
+// 	err := sessionState.Start(preparationDeadline)
+// 	if err != nil {
+// 		panic("PANIC: invalid session state")
+// 	}
+// 	return service.applyStateChange(tx, session)
+// }
 
 // Chooses heroes for player. It returns boolean that represents whether the preparation ends (other player have chosen their heroes too) or not.
 func (service *SessionServiceImpl) PreparePlayer(playerId string, chosenHeroes []heroes.BaseHeroEnum) (bool, error) {
@@ -321,31 +400,15 @@ func (service *SessionServiceImpl) checkForExpire(sessionId string, lastStateId 
 	return nil
 }
 
-func (service *SessionServiceImpl) checkPlayerSession(tx databases.BadgerTx, playerId string) error {
+func (service *SessionServiceImpl) isInSession(tx databases.BadgerTx, playerId string) error {
 	plrSession, err := service.SessionRepository.GetSessionByPlayerId(tx, playerId)
 	if err != nil {
 		return err
 	}
-	if plrSession != nil && plrSession.IsRunning() {
-		return errors.New("player is in running session")
+	if plrSession != nil {
+		return ErrInSession
 	}
 	return nil
-}
-
-func (service *SessionServiceImpl) checkOpponentSession(tx databases.BadgerTx, playerId string, opponentId string) (bool, error) {
-	oppSession, err := service.SessionRepository.GetSessionByPlayerId(tx, opponentId)
-	if err != nil {
-		return false, err
-	}
-	if oppSession != nil {
-		if oppSession.IsRunning() {
-			return false, errors.New("opponent is in running session")
-		} else {
-			oppSessionOtherId, _ := oppSession.GetOtherPlayerId(opponentId)
-			return oppSessionOtherId == playerId, nil // start match if opponent of opponent is player
-		}
-	}
-	return false, nil
 }
 
 func (service *SessionServiceImpl) EndSession(tx databases.BadgerTx, session *models.Session, winnerId *string) error {
@@ -409,8 +472,8 @@ func (service *SessionServiceImpl) applyStateChange(tx databases.BadgerTx, sessi
 	return nil
 }
 
-func (service *SessionServiceImpl) CompileSession(sessionId string) (map[string]interface{}, error) {
-	session, err := service.GetSessionById(nil, sessionId)
+func (service *SessionServiceImpl) CompileSession(tx databases.BadgerTx, sessionId string) (map[string]interface{}, error) {
+	session, err := service.GetSessionById(tx, sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -422,24 +485,24 @@ func (service *SessionServiceImpl) CompileSession(sessionId string) (map[string]
 		return nil, err
 	}
 
-	matchMap, err := service.MapService.GetSessionMap(nil, sessionId)
+	matchMap, err := service.MapService.GetSessionMap(tx, sessionId)
 	if err != nil {
 		return nil, err
 	}
-	heroList1, err := service.HeroService.GetPlayerHeroes(nil, sessionId, session.PlayerIds[0])
+	heroList1, err := service.HeroService.GetPlayerHeroes(tx, sessionId, session.PlayerIds[0])
 	if err != nil && err == ErrEmptyHero {
 		heroList1 = make([]*models.Hero, 0)
 	} else if err != nil {
 		return nil, err
 	}
-	heroList2, err := service.HeroService.GetPlayerHeroes(nil, sessionId, session.PlayerIds[1])
+	heroList2, err := service.HeroService.GetPlayerHeroes(tx, sessionId, session.PlayerIds[1])
 	if err != nil && err == ErrEmptyHero {
 		heroList2 = make([]*models.Hero, 0)
 	} else if err != nil {
 		return nil, err
 	}
 
-	logs, err := service.LogService.GetSessionLogs(nil, sessionId)
+	logs, err := service.LogService.GetSessionLogs(tx, sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -469,6 +532,7 @@ func NewSessionService(
 	stateFactory states.SessionStateFactory,
 	transactionManager databases.TransactionManager,
 	logService LogService,
+	eventManager events.EventManager,
 ) SessionService {
 	return &SessionServiceImpl{
 		MapService:         mapService,
@@ -478,5 +542,6 @@ func NewSessionService(
 		StateFactory:       stateFactory,
 		TransactionManager: transactionManager,
 		LogService:         logService,
+		EventManager:       eventManager,
 	}
 }

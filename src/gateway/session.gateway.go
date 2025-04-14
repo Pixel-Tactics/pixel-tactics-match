@@ -16,9 +16,10 @@ import (
 type SessionGateway interface {
 	GetIsPlayerInSession(client *messages.WebSocketMessager)
 	GetSession(client *messages.WebSocketMessager)
-	CreateSession(client *messages.WebSocketMessager)
+	// CreateSession(client *messages.WebSocketMessager)
 	PreparePlayer(client *messages.WebSocketMessager)
 	GetServerTime(client *messages.WebSocketMessager)
+	HasMessager
 }
 
 type SessionGatewayImpl struct {
@@ -86,76 +87,76 @@ func (gateway *SessionGatewayImpl) GetSession(client *messages.WebSocketMessager
 	})
 }
 
-func (gateway *SessionGatewayImpl) CreateSession(client *messages.WebSocketMessager) {
-	if client.ClientId == nil {
-		client.SendBack(Error(errors.New("not authenticated")))
-		return
-	}
+// func (gateway *SessionGatewayImpl) CreateSession(client *messages.WebSocketMessager) {
+// 	if client.ClientId == nil {
+// 		client.SendBack(Error(errors.New("not authenticated")))
+// 		return
+// 	}
 
-	var body dto.CreateSessionRequest
-	err := convert_utils.MapToObject(client.Message.Body, &body)
-	if err != nil {
-		client.SendBack(Error(err))
-		return
-	}
+// 	var body dto.CreateSessionRequest
+// 	err := convert_utils.MapToObject(client.Message.Body, &body)
+// 	if err != nil {
+// 		client.SendBack(Error(err))
+// 		return
+// 	}
 
-	err = gateway.Validator.Struct(body)
-	if err != nil {
-		log.Println(err)
-		client.SendBack(Error(errors.New("invalid input")))
-		return
-	}
+// 	err = gateway.Validator.Struct(body)
+// 	if err != nil {
+// 		log.Println(err)
+// 		client.SendBack(Error(errors.New("invalid input")))
+// 		return
+// 	}
 
-	if *client.ClientId == body.OpponentId {
-		client.SendBack(Error(errors.New("invalid opponent")))
-		return
-	}
+// 	if *client.ClientId == body.OpponentId {
+// 		client.SendBack(Error(errors.New("invalid opponent")))
+// 		return
+// 	}
 
-	session, err := gateway.SessionService.CreateSession(*client.ClientId, body.OpponentId)
-	if err != nil {
-		client.SendBack(Error(err))
-		return
-	}
+// 	session, err := gateway.SessionService.CreateSession(*client.ClientId, body.OpponentId)
+// 	if err != nil {
+// 		client.SendBack(Error(err))
+// 		return
+// 	}
 
-	client.SendBack(&messages.Message{
-		Type: client.Message.Type,
-		Body: map[string]interface{}{
-			"success": true,
-		},
-	})
+// 	client.SendBack(&messages.Message{
+// 		Type: client.Message.Type,
+// 		Body: map[string]interface{}{
+// 			"success": true,
+// 		},
+// 	})
 
-	if !session.IsRunning() {
-		client.Send(body.OpponentId, &messages.Message{
-			Type: TYPE_INVITE_SESSION,
-			Body: map[string]interface{}{
-				"playerId": *client.ClientId,
-			},
-		})
-	} else {
-		message := "successfully created session"
-		response, err := gateway.SessionService.CompileSession(session.Id)
-		if err != nil {
-			log.Println(err)
-			message = "successfully created session, but error on showing data"
-		}
-		client.Send(body.OpponentId, &messages.Message{
-			Type: TYPE_START_SESSION,
-			Body: map[string]interface{}{
-				"message":    message,
-				"opponentId": *client.ClientId,
-				"session":    response,
-			},
-		})
-		client.Send(*client.ClientId, &messages.Message{
-			Type: TYPE_START_SESSION,
-			Body: map[string]interface{}{
-				"message":    message,
-				"opponentId": body.OpponentId,
-				"session":    response,
-			},
-		})
-	}
-}
+// 	if !session.IsRunning() {
+// 		client.Send(body.OpponentId, &messages.Message{
+// 			Type: TYPE_INVITE_SESSION,
+// 			Body: map[string]interface{}{
+// 				"playerId": *client.ClientId,
+// 			},
+// 		})
+// 	} else {
+// 		message := "successfully created session"
+// 		response, err := gateway.SessionService.CompileSession(session.Id)
+// 		if err != nil {
+// 			log.Println(err)
+// 			message = "successfully created session, but error on showing data"
+// 		}
+// 		client.Send(body.OpponentId, &messages.Message{
+// 			Type: TYPE_START_SESSION,
+// 			Body: map[string]interface{}{
+// 				"message":    message,
+// 				"opponentId": *client.ClientId,
+// 				"session":    response,
+// 			},
+// 		})
+// 		client.Send(*client.ClientId, &messages.Message{
+// 			Type: TYPE_START_SESSION,
+// 			Body: map[string]interface{}{
+// 				"message":    message,
+// 				"opponentId": body.OpponentId,
+// 				"session":    response,
+// 			},
+// 		})
+// 	}
+// }
 
 func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessager) {
 	if client.ClientId == nil {
@@ -192,7 +193,7 @@ func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessa
 			notifyMessage = "Battle is started, but error on showing data"
 		}
 
-		response, err := gateway.SessionService.CompileSession(session.Id)
+		response, err := gateway.SessionService.CompileSession(nil, session.Id)
 		if err != nil {
 			log.Println(err)
 			notifyMessage = "Battle is started, but error on showing data"
@@ -258,15 +259,36 @@ func (gateway *SessionGatewayImpl) GetServerTime(client *messages.WebSocketMessa
 	})
 }
 
+func (gateway *SessionGatewayImpl) NotifySessionCreated(data interface{}) error {
+	event, ok := data.(*services.SessionCreatedEvent)
+	if !ok {
+		log.Println("invalid event class: ")
+		panic(data)
+	}
+	for i, playerId := range event.PlayerIds {
+		gateway.Messager.Send(playerId, &messages.Message{
+			Type: TYPE_START_SESSION,
+			Body: map[string]interface{}{
+				"message":    "Session started...",
+				"opponentId": event.PlayerIds[(i+1)%2],
+				"session":    event.Data,
+			},
+		})
+	}
+	return nil
+}
+
 func NewSessionGateway(
 	sessionService services.SessionService,
 	eventManager events.EventManager,
 	validator *validator.Validate,
 ) SessionGateway {
-	return &SessionGatewayImpl{
+	gateway := &SessionGatewayImpl{
 		SessionService: sessionService,
 		BaseGateway: BaseGateway{
 			Validator: validator,
 		},
 	}
+	eventManager.On(services.SESSION_CREATED_EVENT, gateway.NotifySessionCreated)
+	return gateway
 }

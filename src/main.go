@@ -37,14 +37,16 @@ func main() {
 	playerRepo := repositories.NewPlayerRepository(badger)
 	sessionRepo := repositories.NewSessionRepositoryV2(badger)
 	logRepo := repositories.NewSessionLogRepository(badger)
+	inviteRepo := repositories.NewInvitationRepository()
 
 	authService := services.NewAuthService()
 	mapService := services.NewMapService(mapRepo, nil)
 	heroService := services.NewHeroService(heroRepo, nil, nil, heroFactory, badger)
 	playerService := services.NewPlayerService(playerRepo, nil)
 	logService := services.NewLogService(logRepo, eventManager)
-	sessionService := services.NewSessionService(mapService, heroService, playerService, sessionRepo, stateFactory, badger, logService)
+	sessionService := services.NewSessionService(mapService, heroService, playerService, sessionRepo, stateFactory, badger, logService, eventManager)
 	actionService := services.NewActionService(mapService, heroService, sessionService, logService, badger)
+	inviteService := services.NewInvitationService(inviteRepo, badger, sessionService)
 
 	mapService.SetHeroService(heroService)
 	playerService.SetSessionService(sessionService)
@@ -55,10 +57,12 @@ func main() {
 	sessionGateway := gateway.NewSessionGateway(sessionService, eventManager, validator)
 	actionGateway := gateway.NewActionGateway(actionService, validator)
 	logGateway := gateway.NewLogGateway(logService, eventManager, validator)
-	gatewayRouter := gateway.NewRouter(authGateway, sessionGateway, actionGateway)
+	inviteGateway := gateway.NewInvitationGateway(inviteService, validator)
+	gatewayRouter := gateway.NewRouter(authGateway, sessionGateway, actionGateway, inviteGateway)
 	clientHub := websockets.NewClientHub(gatewayRouter)
 
 	logGateway.SetMessager(clientHub)
+	sessionGateway.SetMessager(clientHub)
 
 	go clientHub.Run()
 

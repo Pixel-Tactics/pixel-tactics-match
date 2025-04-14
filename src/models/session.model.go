@@ -33,10 +33,6 @@ type State struct {
 	Deadline time.Time    `json:"deadline"`
 }
 
-func (session *Session) IsRunning() bool {
-	return session.State.Type != SessionStateMatchMaking
-}
-
 func (session *Session) GetOtherPlayerId(playerId string) (string, error) {
 	if playerId != session.PlayerIds[0] && playerId != session.PlayerIds[1] {
 		return "", errors.New("invalid player id")

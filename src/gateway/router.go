@@ -8,7 +8,8 @@ import (
 
 const (
 	// Request
-	TYPE_CREATE_SESSION string = "CREATE_SESSION"
+	TYPE_INVITE_PLAYER string = "INVITE_PLAYER"
+	// TYPE_CREATE_SESSION string = "CREATE_SESSION"
 	// TYPE_IS_IN_SESSION  string = "IS_IN_SESSION"
 	// TYPE_GET_SESSION    string = "GET_SESSION"
 
@@ -34,17 +35,18 @@ type Router interface {
 }
 
 type RouterImpl struct {
-	AuthGateway    AuthGateway
-	SessionGateway SessionGateway
-	ActionGateway  ActionGateway
+	AuthGateway       AuthGateway
+	SessionGateway    SessionGateway
+	ActionGateway     ActionGateway
+	InvitationGateway InvitationGateway
 }
 
 func (router *RouterImpl) RouteMessage(client *messages.WebSocketMessager) {
 	switch client.Message.Type {
 	case TYPE_AUTH:
 		router.AuthGateway.AuthenticateClient(client)
-	case TYPE_CREATE_SESSION:
-		router.SessionGateway.CreateSession(client)
+	case TYPE_INVITE_PLAYER:
+		router.InvitationGateway.Invite(client)
 	case TYPE_PREPARE_PLAYER:
 		router.SessionGateway.PreparePlayer(client)
 	case TYPE_SERVER_TIME:
@@ -64,10 +66,12 @@ func NewRouter(
 	authGateway AuthGateway,
 	sessionGateway SessionGateway,
 	actionGateway ActionGateway,
+	invitationGateway InvitationGateway,
 ) Router {
 	return &RouterImpl{
-		AuthGateway:    authGateway,
-		SessionGateway: sessionGateway,
-		ActionGateway:  actionGateway,
+		AuthGateway:       authGateway,
+		SessionGateway:    sessionGateway,
+		ActionGateway:     actionGateway,
+		InvitationGateway: invitationGateway,
 	}
 }

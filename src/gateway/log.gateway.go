@@ -11,7 +11,7 @@ import (
 )
 
 type LogGateway interface {
-	SetMessager(messager messages.Messager)
+	HasMessager
 }
 
 type LogGatewayImpl struct {
@@ -39,10 +39,6 @@ func (gateway *LogGatewayImpl) sendLogUpdates(event interface{}) error {
 		})
 	}
 	return nil
-}
-
-func (gateway *LogGatewayImpl) SetMessager(messager messages.Messager) {
-	gateway.Messager = messager
 }
 
 func NewLogGateway(
