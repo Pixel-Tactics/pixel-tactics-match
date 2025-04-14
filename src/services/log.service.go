@@ -39,7 +39,7 @@ func (service *LogServiceImpl) AppendLog(tx databases.BadgerTx, session *models.
 	if err != nil {
 		return err
 	}
-	if logCount < 3 && session.State.Type != models.SessionStateEnded {
+	if logCount < 2 && session.State.Type != models.SessionStateEnded {
 		return nil
 	}
 
