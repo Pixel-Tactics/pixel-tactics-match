@@ -12,7 +12,7 @@ import (
 )
 
 type InvitationGateway interface {
-	Invite(client *messages.WebSocketMessager)
+	Invite(client messages.ClientMessager, message *messages.Message)
 	HasMessager
 }
 
@@ -22,14 +22,9 @@ type InvitationGatewayImpl struct {
 	BaseGateway
 }
 
-func (gateway *InvitationGatewayImpl) Invite(client *messages.WebSocketMessager) {
-	if client.ClientId == nil {
-		client.SendBack(Error(ErrNotAuthenticated))
-		return
-	}
-
+func (gateway *InvitationGatewayImpl) Invite(client messages.ClientMessager, message *messages.Message) {
 	var body dto.InvitationRequest
-	err := convert_utils.MapToObject(client.Message.Body, &body)
+	err := convert_utils.MapToObject(message.Data, &body)
 	if err != nil {
 		client.SendBack(Error(err))
 		return
@@ -42,7 +37,7 @@ func (gateway *InvitationGatewayImpl) Invite(client *messages.WebSocketMessager)
 		return
 	}
 
-	isMutual, err := gateway.InvitationService.Invite(*client.ClientId, body.PlayerId)
+	isMutual, err := gateway.InvitationService.Invite(client.GetUsername(), body.PlayerId)
 	if err != nil {
 		log.Println(err)
 		client.SendBack(Error(err))
@@ -53,13 +48,9 @@ func (gateway *InvitationGatewayImpl) Invite(client *messages.WebSocketMessager)
 		return
 	}
 
-	client.SendBack(&messages.Message{
-		Type: client.Message.Type,
-		Body: map[string]interface{}{
-			"message": "successfully sent an invitation...",
-			"success": true,
-		},
-	})
+	client.SendBack(messages.CreateMessage(message.Route, map[string]interface{}{
+		"success": true,
+	}, "successfully sent an invitation..."))
 }
 
 func (gateway *InvitationGatewayImpl) NotifyInvite(data interface{}) error {
@@ -68,12 +59,13 @@ func (gateway *InvitationGatewayImpl) NotifyInvite(data interface{}) error {
 		log.Println("invalid event class: ")
 		panic(data)
 	}
-	gateway.Messager.Send(event.DstPlayerId, &messages.Message{
-		Type: TYPE_INVITE_SESSION,
-		Body: map[string]interface{}{
+	gateway.Messager.Send(event.DstPlayerId, messages.CreateMessage(
+		TYPE_INVITE_SESSION,
+		map[string]interface{}{
 			"playerId": event.SrcPlayerId,
 		},
-	})
+		"",
+	))
 	return nil
 }
 

@@ -12,9 +12,9 @@ import (
 )
 
 type ActionGateway interface {
-	Move(client *messages.WebSocketMessager)
-	Attack(client *messages.WebSocketMessager)
-	EndTurn(client *messages.WebSocketMessager)
+	Move(client messages.ClientMessager, message *messages.Message)
+	Attack(client messages.ClientMessager, message *messages.Message)
+	EndTurn(client messages.ClientMessager, message *messages.Message)
 }
 
 type ActionGatewayImpl struct {
@@ -22,14 +22,9 @@ type ActionGatewayImpl struct {
 	BaseGateway
 }
 
-func (gateway *ActionGatewayImpl) Move(client *messages.WebSocketMessager) {
-	if client.ClientId == nil {
-		client.SendBack(Error(errors.New("not authenticated")))
-		return
-	}
-
+func (gateway *ActionGatewayImpl) Move(client messages.ClientMessager, message *messages.Message) {
 	var body dto.MoveRequest
-	err := convert_utils.MapToObject(client.Message.Body, &body)
+	err := convert_utils.MapToObject(message.Data, &body)
 	if err != nil {
 		client.SendBack(Error(err))
 		return
@@ -42,7 +37,7 @@ func (gateway *ActionGatewayImpl) Move(client *messages.WebSocketMessager) {
 		return
 	}
 
-	err = gateway.ActionService.Move(*client.ClientId, body.Hero, body.Directions)
+	err = gateway.ActionService.Move(client.GetUsername(), body.Hero, body.Directions)
 	if err != nil {
 		client.SendBack(Error(err))
 		return
@@ -50,14 +45,9 @@ func (gateway *ActionGatewayImpl) Move(client *messages.WebSocketMessager) {
 	// When action is executed, it will be sent back to user via event
 }
 
-func (gateway *ActionGatewayImpl) Attack(client *messages.WebSocketMessager) {
-	if client.ClientId == nil {
-		client.SendBack(Error(errors.New("not authenticated")))
-		return
-	}
-
+func (gateway *ActionGatewayImpl) Attack(client messages.ClientMessager, message *messages.Message) {
 	var body dto.AttackRequest
-	err := convert_utils.MapToObject(client.Message.Body, &body)
+	err := convert_utils.MapToObject(message.Data, &body)
 	if err != nil {
 		client.SendBack(Error(err))
 		return
@@ -70,7 +60,7 @@ func (gateway *ActionGatewayImpl) Attack(client *messages.WebSocketMessager) {
 		return
 	}
 
-	err = gateway.ActionService.Attack(*client.ClientId, body.SrcHero, body.DstHero)
+	err = gateway.ActionService.Attack(client.GetUsername(), body.SrcHero, body.DstHero)
 	if err != nil {
 		client.SendBack(Error(err))
 		return
@@ -78,13 +68,8 @@ func (gateway *ActionGatewayImpl) Attack(client *messages.WebSocketMessager) {
 	// When action is executed, it will be sent back to user via event
 }
 
-func (gateway *ActionGatewayImpl) EndTurn(client *messages.WebSocketMessager) {
-	if client.ClientId == nil {
-		client.SendBack(Error(errors.New("not authenticated")))
-		return
-	}
-
-	err := gateway.ActionService.EndTurn(*client.ClientId)
+func (gateway *ActionGatewayImpl) EndTurn(client messages.ClientMessager, message *messages.Message) {
+	err := gateway.ActionService.EndTurn(client.GetUsername())
 	if err != nil {
 		client.SendBack(Error(err))
 		return

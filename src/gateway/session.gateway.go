@@ -14,11 +14,10 @@ import (
 )
 
 type SessionGateway interface {
-	GetIsPlayerInSession(client *messages.WebSocketMessager)
-	GetSession(client *messages.WebSocketMessager)
-	// CreateSession(client *messages.WebSocketMessager)
-	PreparePlayer(client *messages.WebSocketMessager)
-	GetServerTime(client *messages.WebSocketMessager)
+	GetIsPlayerInSession(client messages.ClientMessager, message *messages.Message)
+	GetSession(client messages.ClientMessager, message *messages.Message)
+	PreparePlayer(client messages.ClientMessager, message *messages.Message)
+	GetServerTime(client messages.ClientMessager, message *messages.Message)
 	HasMessager
 }
 
@@ -27,9 +26,9 @@ type SessionGatewayImpl struct {
 	BaseGateway
 }
 
-func (gateway *SessionGatewayImpl) GetIsPlayerInSession(client *messages.WebSocketMessager) {
+func (gateway *SessionGatewayImpl) GetIsPlayerInSession(client messages.ClientMessager, message *messages.Message) {
 	var body dto.PlayerId
-	err := convert_utils.MapToObject(client.Message.Body, &body)
+	err := convert_utils.MapToObject(message.Data, &body)
 	if err != nil {
 		client.SendBack(Error(err))
 		return
@@ -46,18 +45,15 @@ func (gateway *SessionGatewayImpl) GetIsPlayerInSession(client *messages.WebSock
 		client.SendBack(Error(err))
 		return
 	}
-	client.SendBack(&messages.Message{
-		Type:       client.Message.Type,
-		Identifier: client.Message.Identifier,
-		Body: map[string]interface{}{
-			"inSession": session != nil,
-		},
-	})
+
+	client.SendBack(messages.CreateMessage(message.Route, map[string]interface{}{
+		"inSession": session != nil,
+	}, ""))
 }
 
-func (gateway *SessionGatewayImpl) GetSession(client *messages.WebSocketMessager) {
+func (gateway *SessionGatewayImpl) GetSession(client messages.ClientMessager, message *messages.Message) {
 	var body dto.PlayerId
-	err := convert_utils.MapToObject(client.Message.Body, &body)
+	err := convert_utils.MapToObject(message.Data, &body)
 	if err != nil {
 		client.SendBack(Error(err))
 		return
@@ -80,21 +76,12 @@ func (gateway *SessionGatewayImpl) GetSession(client *messages.WebSocketMessager
 	}
 
 	response, _ := convert_utils.ObjectToMap(session)
-	client.SendBack(&messages.Message{
-		Type:       client.Message.Type,
-		Identifier: client.Message.Identifier,
-		Body:       response,
-	})
+	client.SendBack(messages.CreateMessage(message.Route, response, ""))
 }
 
-func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessager) {
-	if client.ClientId == nil {
-		client.SendBack(Error(errors.New("not authenticated")))
-		return
-	}
-
+func (gateway *SessionGatewayImpl) PreparePlayer(client messages.ClientMessager, message *messages.Message) {
 	var body dto.PreparePlayerRequest
-	err := convert_utils.MapToObject(client.Message.Body, &body)
+	err := convert_utils.MapToObject(message.Data, &body)
 	if err != nil {
 		client.SendBack(Error(err))
 		return
@@ -107,15 +94,15 @@ func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessa
 		return
 	}
 
-	isStarted, err := gateway.SessionService.PreparePlayer(*client.ClientId, body.ChosenHeroList)
+	isStarted, err := gateway.SessionService.PreparePlayer(client.GetUsername(), body.ChosenHeroList)
 	if err != nil {
 		client.SendBack(Error(err))
 		return
 	}
 
-	var message string
+	var msg string
 	if isStarted {
-		session, err := gateway.SessionService.GetSessionByPlayerId(nil, *client.ClientId)
+		session, err := gateway.SessionService.GetSessionByPlayerId(nil, client.GetUsername())
 		var notifyMessage string
 		if err != nil {
 			log.Println(err)
@@ -128,42 +115,30 @@ func (gateway *SessionGatewayImpl) PreparePlayer(client *messages.WebSocketMessa
 			notifyMessage = "Battle is started, but error on showing data"
 		}
 
-		otherId, _ := session.GetOtherPlayerId(*client.ClientId)
-		client.Send(otherId, &messages.Message{
-			Type: TYPE_START_BATTLE,
-			Body: map[string]interface{}{
-				"message":    notifyMessage,
-				"opponentId": *client.ClientId,
-				"session":    response,
-			},
-		})
-		client.Send(*client.ClientId, &messages.Message{
-			Type: TYPE_START_BATTLE,
-			Body: map[string]interface{}{
-				"message":    notifyMessage,
-				"opponentId": otherId,
-				"session":    response,
-			},
-		})
+		otherId, _ := session.GetOtherPlayerId(client.GetUsername())
+		client.Send(otherId, messages.CreateMessage(TYPE_START_BATTLE, map[string]interface{}{
+			"opponentId": client.GetUsername(),
+			"session":    response,
+		}, notifyMessage))
+		client.Send(client.GetUsername(), messages.CreateMessage(TYPE_START_BATTLE, map[string]interface{}{
+			"opponentId": otherId,
+			"session":    response,
+		}, notifyMessage))
 
-		message = "Battle is started.."
+		msg = "Battle is started.."
 		log.Println("Battle is started..")
 	} else {
-		message = "Waiting for other player.."
+		msg = "Waiting for other player.."
 	}
 
-	client.SendBack(&messages.Message{
-		Type: client.Message.Type,
-		Body: map[string]interface{}{
-			"success": true,
-			"message": message,
-		},
-	})
+	client.SendBack(messages.CreateMessage(message.Route, map[string]interface{}{
+		"success": true,
+	}, msg))
 }
 
-func (gateway *SessionGatewayImpl) GetServerTime(client *messages.WebSocketMessager) {
+func (gateway *SessionGatewayImpl) GetServerTime(client messages.ClientMessager, message *messages.Message) {
 	var body dto.ServerTimeRequest
-	err := convert_utils.MapToObject(client.Message.Body, &body)
+	err := convert_utils.MapToObject(message.Data, &body)
 	if err != nil {
 		client.SendBack(Error(err))
 		return
@@ -179,13 +154,10 @@ func (gateway *SessionGatewayImpl) GetServerTime(client *messages.WebSocketMessa
 	curTime := float64(time.Now().UnixMilli())
 	resTime := curTime / 1000.0
 
-	client.SendBack(&messages.Message{
-		Type: client.Message.Type,
-		Body: map[string]interface{}{
-			"localTime":  body.LocalTime,
-			"serverTime": resTime,
-		},
-	})
+	client.SendBack(messages.CreateMessage(message.Route, map[string]interface{}{
+		"localTime":  body.LocalTime,
+		"serverTime": resTime,
+	}, ""))
 }
 
 func (gateway *SessionGatewayImpl) NotifySessionCreated(data interface{}) error {
@@ -195,14 +167,14 @@ func (gateway *SessionGatewayImpl) NotifySessionCreated(data interface{}) error 
 		panic(data)
 	}
 	for i, playerId := range event.PlayerIds {
-		gateway.Messager.Send(playerId, &messages.Message{
-			Type: TYPE_START_SESSION,
-			Body: map[string]interface{}{
-				"message":    "Session started...",
+		gateway.Messager.Send(playerId, messages.CreateMessage(
+			TYPE_START_SESSION,
+			map[string]interface{}{
 				"opponentId": event.PlayerIds[(i+1)%2],
 				"session":    event.Data,
 			},
-		})
+			"Session started...",
+		))
 	}
 	return nil
 }

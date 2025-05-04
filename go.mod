@@ -6,7 +6,6 @@ require (
 	github.com/dgraph-io/badger/v4 v4.5.0
 	github.com/emirpasic/gods v1.18.1
 	github.com/gin-gonic/gin v1.10.0
-	github.com/go-playground/assert/v2 v2.2.0
 	github.com/go-playground/validator/v10 v10.25.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.1

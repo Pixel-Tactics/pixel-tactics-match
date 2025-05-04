@@ -15,7 +15,6 @@ const (
 
 	TYPE_PREPARE_PLAYER string = "PREPARE_PLAYER"
 	TYPE_SERVER_TIME    string = "SERVER_TIME"
-	TYPE_AUTH           string = "AUTH"
 	TYPE_MOVE           string = "ACTION_MOVE"
 	TYPE_ATTACK         string = "ACTION_ATTACK"
 	TYPE_END_TURN       string = "ACTION_END_TURN"
@@ -31,45 +30,40 @@ const (
 )
 
 type Router interface {
-	RouteMessage(client *messages.WebSocketMessager)
+	RouteMessage(client messages.ClientMessager, message *messages.Message)
 }
 
 type RouterImpl struct {
-	AuthGateway       AuthGateway
 	SessionGateway    SessionGateway
 	ActionGateway     ActionGateway
 	InvitationGateway InvitationGateway
 }
 
-func (router *RouterImpl) RouteMessage(client *messages.WebSocketMessager) {
-	switch client.Message.Type {
-	case TYPE_AUTH:
-		router.AuthGateway.AuthenticateClient(client)
+func (router *RouterImpl) RouteMessage(client messages.ClientMessager, message *messages.Message) {
+	switch message.Route {
 	case TYPE_INVITE_PLAYER:
-		router.InvitationGateway.Invite(client)
+		router.InvitationGateway.Invite(client, message)
 	case TYPE_PREPARE_PLAYER:
-		router.SessionGateway.PreparePlayer(client)
+		router.SessionGateway.PreparePlayer(client, message)
 	case TYPE_SERVER_TIME:
-		router.SessionGateway.GetServerTime(client)
+		router.SessionGateway.GetServerTime(client, message)
 	case TYPE_MOVE:
-		router.ActionGateway.Move(client)
+		router.ActionGateway.Move(client, message)
 	case TYPE_ATTACK:
-		router.ActionGateway.Attack(client)
+		router.ActionGateway.Attack(client, message)
 	case TYPE_END_TURN:
-		router.ActionGateway.EndTurn(client)
+		router.ActionGateway.EndTurn(client, message)
 	default:
 		client.SendBack(Error(errors.New("invalid type")))
 	}
 }
 
 func NewRouter(
-	authGateway AuthGateway,
 	sessionGateway SessionGateway,
 	actionGateway ActionGateway,
 	invitationGateway InvitationGateway,
 ) Router {
 	return &RouterImpl{
-		AuthGateway:       authGateway,
 		SessionGateway:    sessionGateway,
 		ActionGateway:     actionGateway,
 		InvitationGateway: invitationGateway,

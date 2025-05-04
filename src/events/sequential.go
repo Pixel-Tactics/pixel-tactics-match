@@ -1,12 +1,21 @@
 package events
 
-import "errors"
+import (
+	"errors"
+	"sync"
+
+	"github.com/google/uuid"
+)
 
 type SequentialEventManager struct {
-	Subscribers map[string][]func(interface{}) error
+	Subscribers map[string]map[string]func(interface{}) error
+	*sync.RWMutex
 }
 
 func (manager *SequentialEventManager) Emit(key string, value interface{}) error {
+	manager.RLock()
+	defer manager.RUnlock()
+
 	subscribers, ok := manager.Subscribers[key]
 	if !ok {
 		return nil
@@ -25,13 +34,29 @@ func (manager *SequentialEventManager) Emit(key string, value interface{}) error
 	}
 }
 
-func (manager *SequentialEventManager) On(key string, foo func(interface{}) error) {
+func (manager *SequentialEventManager) On(key string, foo func(interface{}) error) string {
+	manager.Lock()
+	defer manager.Unlock()
+
 	subscribers, ok := manager.Subscribers[key]
 	if !ok {
-		subscribers = make([]func(interface{}) error, 0)
+		subscribers = make(map[string]func(interface{}) error)
 	}
-	subscribers = append(subscribers, foo)
+	id := uuid.New().String()
+	subscribers[id] = foo
 	manager.Subscribers[key] = subscribers
+	return id
+}
+
+func (manager *SequentialEventManager) RemoveOn(key string, id string) {
+	manager.Lock()
+	defer manager.Unlock()
+
+	subscribers, ok := manager.Subscribers[key]
+	if !ok {
+		return
+	}
+	delete(subscribers, id)
 }
 
 func (manager *SequentialEventManager) Run() error {
@@ -40,6 +65,7 @@ func (manager *SequentialEventManager) Run() error {
 
 func NewSequentialEventManager() *SequentialEventManager {
 	return &SequentialEventManager{
-		Subscribers: make(map[string][]func(interface{}) error),
+		Subscribers: make(map[string]map[string]func(interface{}) error),
+		RWMutex:     new(sync.RWMutex),
 	}
 }

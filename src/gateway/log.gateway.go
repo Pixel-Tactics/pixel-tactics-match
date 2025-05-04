@@ -33,10 +33,11 @@ func (gateway *LogGatewayImpl) sendLogUpdates(event interface{}) error {
 		log.Fatalln(err)
 	}
 	for _, playerID := range concreteEvent.PlayerIDs {
-		gateway.Messager.Send(playerID, &messages.Message{
-			Type: TYPE_STATE_CHANGE,
-			Body: response,
-		})
+		gateway.Messager.Send(playerID, messages.CreateMessage(
+			TYPE_STATE_CHANGE,
+			response,
+			"",
+		))
 	}
 	return nil
 }

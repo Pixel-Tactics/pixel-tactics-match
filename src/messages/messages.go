@@ -3,9 +3,10 @@ package messages
 import (
 	"encoding/json"
 	"errors"
-
-	"pixeltactics.com/match/src/exceptions"
 )
+
+var ErrInvalidJson = errors.New("invalid json")
+var ErrInvalidMessage = errors.New("invalid message")
 
 type Messager interface {
 	Send(clientId string, message *Message)
@@ -13,56 +14,51 @@ type Messager interface {
 
 type ClientMessager interface {
 	SendBack(message *Message)
+	GetUsername() string
 	Messager
 }
 
-type WebSocketMessager struct {
-	Message     *Message
-	ClientId    *string
-	Send        func(clientId string, message *Message)
-	SendBack    func(message *Message)
-	SetClientId func(clientId string)
-}
-
 type Message struct {
-	Type       string                 `json:"type"`
-	Identifier string                 `json:"identifier"`
-	Body       map[string]interface{} `json:"body"`
+	Route string                 `json:"route"`
+	Data  map[string]interface{} `json:"data"`
 }
 
 func JsonBytesToMessage(jsonBytes []byte) (*Message, error) {
-	var raw map[string]json.RawMessage
-	err := json.Unmarshal(jsonBytes, &raw)
+	var message Message
+	err := json.Unmarshal(jsonBytes, &message)
 	if err != nil {
-		return nil, exceptions.InvalidJsonError()
+		return nil, ErrInvalidJson
 	}
-
-	var messageType string
-	err = json.Unmarshal(raw["type"], &messageType)
-	if err != nil {
-		return nil, exceptions.InvalidJsonError()
-	}
-
-	var identifier string
-	err = json.Unmarshal(raw["identifier"], &identifier)
-	if err != nil {
-		return nil, exceptions.InvalidJsonError()
-	}
-
-	var body map[string]interface{}
-	err = json.Unmarshal(raw["body"], &body)
-	if err != nil {
-		return nil, exceptions.InvalidJsonError()
-	}
-
-	return &Message{Type: messageType, Identifier: identifier, Body: body}, nil
+	return &message, nil
 }
 
 func MessageToJsonBytes(message *Message) ([]byte, error) {
 	jsonBytes, err := json.Marshal(message)
 	if err != nil {
-		return nil, errors.New("message is invalid")
+		return nil, ErrInvalidMessage
+	}
+	return jsonBytes, nil
+}
+
+func CreateMessage(route string, data map[string]interface{}, message string) *Message {
+	if data == nil {
+		data = make(map[string]interface{})
+	}
+	if message != "" {
+		data["message"] = message
 	}
 
-	return jsonBytes, nil
+	return &Message{
+		Route: route,
+		Data:  data,
+	}
+}
+
+func Error(err error) *Message {
+	return &Message{
+		Route: "ERROR",
+		Data: map[string]interface{}{
+			"message": err.Error(),
+		},
+	}
 }

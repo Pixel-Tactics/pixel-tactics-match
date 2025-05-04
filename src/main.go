@@ -9,10 +9,9 @@ import (
 	"pixeltactics.com/match/src/events"
 	"pixeltactics.com/match/src/gateway"
 	"pixeltactics.com/match/src/heroes"
+	"pixeltactics.com/match/src/integrations/communication"
 	"pixeltactics.com/match/src/repositories"
 	"pixeltactics.com/match/src/services"
-	"pixeltactics.com/match/src/utils/cloud"
-	"pixeltactics.com/match/src/websockets"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -22,6 +21,8 @@ import (
 func main() {
 	godotenv.Load()
 	config.Setup()
+
+	rmqManager := communication.NewRMQManager()
 
 	badger := databases.NewBadgerImpl()
 	defer badger.Close()
@@ -39,7 +40,6 @@ func main() {
 	logRepo := repositories.NewSessionLogRepository(badger)
 	inviteRepo := repositories.NewInvitationRepository()
 
-	authService := services.NewAuthService()
 	mapService := services.NewMapService(mapRepo, nil)
 	heroService := services.NewHeroService(heroRepo, nil, nil, heroFactory, badger)
 	playerService := services.NewPlayerService(playerRepo, nil)
@@ -53,19 +53,20 @@ func main() {
 	heroService.SetSessionService(sessionService)
 	heroService.SetPlayerService(playerService)
 
-	authGateway := gateway.NewAuthGateway(authService, validator)
 	sessionGateway := gateway.NewSessionGateway(sessionService, eventManager, validator)
 	actionGateway := gateway.NewActionGateway(actionService, validator)
 	logGateway := gateway.NewLogGateway(logService, eventManager, validator)
 	inviteGateway := gateway.NewInvitationGateway(inviteService, validator, eventManager)
-	gatewayRouter := gateway.NewRouter(authGateway, sessionGateway, actionGateway, inviteGateway)
-	clientHub := websockets.NewClientHub(gatewayRouter)
+	gatewayRouter := gateway.NewRouter(sessionGateway, actionGateway, inviteGateway)
+	incomingQueue := communication.NewIncomingQueue(gatewayRouter, rmqManager, eventManager)
+	outgoingQueue := communication.NewOutgoingQueue(rmqManager, eventManager)
 
-	logGateway.SetMessager(clientHub)
-	sessionGateway.SetMessager(clientHub)
-	inviteGateway.SetMessager(clientHub)
+	logGateway.SetMessager(outgoingQueue)
+	sessionGateway.SetMessager(outgoingQueue)
+	inviteGateway.SetMessager(outgoingQueue)
 
-	go clientHub.Run()
+	go incomingQueue.Run()
+	go outgoingQueue.Run()
 
 	router := gin.Default()
 
@@ -73,22 +74,6 @@ func main() {
 		context.JSON(http.StatusOK, map[string]string{
 			"message": "match service",
 		})
-	})
-
-	router.GET("/region", func(context *gin.Context) {
-		context.JSON(http.StatusOK, map[string]string{
-			"region": cloud.GetServerRegion(),
-		})
-	})
-
-	router.GET("/players", func(context *gin.Context) {
-		context.JSON(http.StatusOK, map[string]interface{}{
-			"players": clientHub.GetAllUserId(),
-		})
-	})
-
-	router.GET("/ws", func(context *gin.Context) {
-		websockets.ServeWebSocket(clientHub, context.Writer, context.Request)
 	})
 
 	router.Run("0.0.0.0:8000")
