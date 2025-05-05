@@ -12,7 +12,7 @@ const INVITE_EVENT = "INVITE_EVENT"
 
 type InvitationService interface {
 	// Invites opponent to play. Returns true when there is mutual invitation.
-	Invite(playerId string, opponentId string) (bool, error)
+	Invite(inviteId string, playerId string, opponentId string) (bool, error)
 }
 
 type InviteEvent struct {
@@ -28,9 +28,14 @@ type InvitationServiceImpl struct {
 }
 
 // Invites opponent to play. Returns true when there is mutual invitation.
-func (service *InvitationServiceImpl) Invite(playerId string, opponentId string) (bool, error) {
+func (service *InvitationServiceImpl) Invite(inviteId string, playerId string, opponentId string) (bool, error) {
 	tx := service.TransactionManager.NewReadWriteTransaction()
 	defer tx.Discard()
+
+	err := service.InvitationRepository.IsDuplicate(tx, inviteId)
+	if err != nil {
+		return false, err
+	}
 
 	inviters, err := service.InvitationRepository.AllInInvitation(tx, playerId)
 	if err != nil {

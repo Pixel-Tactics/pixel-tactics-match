@@ -11,11 +11,14 @@ import (
 
 const MAX_INVITATION = 5
 const INVITATION_TTL = 5 * time.Second
+const INVITATION_ID_TTL = 7 * 24 * time.Hour
 
-var ErrLimitReached = errors.New("limit reached")
-var ErrAlreadyExists = errors.New("already exists")
+var ErrDuplicated = errors.New("duplicate")
 
 type InvitationRepository interface {
+	// Checks whether invite id has been processed or not. If processed, returns nil. If not, returns ErrDuplicated.
+	IsDuplicate(tx databases.BadgerTx, inviteId string) error
+
 	// Get all out invitations. Returns empty array when record doesn't exists.
 	AllOutInvitation(tx databases.BadgerTx, playerId string) ([]string, error)
 
@@ -26,6 +29,7 @@ type InvitationRepository interface {
 	Exists(tx databases.BadgerTx, playerId string, opponentId string) (bool, error)
 
 	// Saves invitation. When there is atleast MAX_INVITATION invitations, ErrInvitationLimitReached will be thrown.
+	// When invitation already exists, it will  be ignored.
 	SaveInvitation(tx databases.BadgerTx, playerId string, opponentId string) error
 
 	// Deletes invitation. If invitation doesn't exists, it will return nil.
@@ -50,6 +54,28 @@ func (repo *InvitationRepositoryImpl) AllOutInvitation(tx databases.BadgerTx, pl
 		return nil, err
 	}
 	return inviteds, nil
+}
+
+// Checks whether invite id has been processed or not. If processed, returns nil. If not, returns ErrDuplicated.
+func (repo *InvitationRepositoryImpl) IsDuplicate(tx databases.BadgerTx, inviteId string) error {
+	if tx == nil {
+		return databases.ErrNilTransaction
+	}
+
+	var temp bool
+	err := tx.Get("invitation:id:"+inviteId, &temp)
+	if err == nil {
+		return ErrDuplicated
+	} else if err != databases.NotFoundException() {
+		return err
+	}
+
+	trueValue := true
+	err = tx.SetWithTTL("invitation:id:"+inviteId, &trueValue, INVITATION_ID_TTL)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Get all in invitations. Returns empty array when record doesn't exists.
@@ -86,6 +112,7 @@ func (repo *InvitationRepositoryImpl) Exists(tx databases.BadgerTx, playerId str
 }
 
 // Saves invitation. When there is already MAX_INVITATION invitations, earliest invitation will be deleted.
+// When invitation already exists, it will  be ignored.
 func (repo *InvitationRepositoryImpl) SaveInvitation(tx databases.BadgerTx, playerId string, opponentId string) error {
 	if tx == nil {
 		return databases.ErrNilTransaction
@@ -102,7 +129,7 @@ func (repo *InvitationRepositoryImpl) SaveInvitation(tx databases.BadgerTx, play
 
 	for _, curId := range playerOutIds {
 		if curId == opponentId {
-			return ErrAlreadyExists
+			return nil
 		}
 	}
 

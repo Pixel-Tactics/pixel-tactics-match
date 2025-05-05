@@ -34,15 +34,12 @@ type Router interface {
 }
 
 type RouterImpl struct {
-	SessionGateway    SessionGateway
-	ActionGateway     ActionGateway
-	InvitationGateway InvitationGateway
+	SessionGateway SessionGateway
+	ActionGateway  ActionGateway
 }
 
 func (router *RouterImpl) RouteMessage(client messages.ClientMessager, message *messages.Message) {
 	switch message.Route {
-	case TYPE_INVITE_PLAYER:
-		router.InvitationGateway.Invite(client, message)
 	case TYPE_PREPARE_PLAYER:
 		router.SessionGateway.PreparePlayer(client, message)
 	case TYPE_SERVER_TIME:
@@ -61,11 +58,9 @@ func (router *RouterImpl) RouteMessage(client messages.ClientMessager, message *
 func NewRouter(
 	sessionGateway SessionGateway,
 	actionGateway ActionGateway,
-	invitationGateway InvitationGateway,
 ) Router {
 	return &RouterImpl{
-		SessionGateway:    sessionGateway,
-		ActionGateway:     actionGateway,
-		InvitationGateway: invitationGateway,
+		SessionGateway: sessionGateway,
+		ActionGateway:  actionGateway,
 	}
 }
