@@ -59,9 +59,9 @@ func main() {
 	inviteGateway := gateway.NewInvitationGateway(inviteService, validator, eventManager)
 	gatewayRouter := gateway.NewRouter(sessionGateway, actionGateway)
 
-	incomingQueue := communication.NewIncomingQueue(gatewayRouter, rmqManager, eventManager)
+	incomingQueue := communication.NewSessionIncomingQueue(gatewayRouter, rmqManager, eventManager)
 	outgoingQueue := communication.NewOutgoingQueue(rmqManager, eventManager)
-	incomingStream := communication.NewIncomingStream(rmqManager, eventManager)
+	incomingStream := communication.NewIncomingQueue(rmqManager)
 
 	logGateway.SetMessager(outgoingQueue)
 	sessionGateway.SetMessager(outgoingQueue)
@@ -69,7 +69,7 @@ func main() {
 
 	go incomingQueue.Run()
 	go outgoingQueue.Run()
-	go incomingStream.Run("matchmaking/invite", gateway.INVITE_REQUEST_EVENT)
+	go incomingStream.Run("matchmaking/invite", inviteGateway.Invite)
 
 	router := gin.Default()
 

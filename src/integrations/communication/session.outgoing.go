@@ -37,6 +37,7 @@ func NewOutgoingQueue(
 		SubscribeIds: make(map[string]string),
 		AddUser:      make(chan string, 256),
 		DeleteUser:   make(chan string, 256),
+		Messages:     make(chan UserMessage, 256),
 	}
 	eventManager.On("user-added", func(event interface{}) error {
 		username, ok := event.(string)

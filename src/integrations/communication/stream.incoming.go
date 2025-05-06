@@ -9,24 +9,22 @@ import (
 	"pixeltactics.com/match/src/gateway"
 )
 
-type IncomingStream struct {
+type IncomingQueue struct {
 	Router       gateway.Router
 	EventManager events.EventManager
 	RMQManager   *RMQManager
 }
 
-func NewIncomingStream(
+func NewIncomingQueue(
 	rmqManager *RMQManager,
-	eventManager events.EventManager,
-) *IncomingStream {
-	queue := &IncomingStream{
-		EventManager: eventManager,
-		RMQManager:   rmqManager,
+) *IncomingQueue {
+	queue := &IncomingQueue{
+		RMQManager: rmqManager,
 	}
 	return queue
 }
 
-func (stream *IncomingStream) Run(streamName string, eventName string) {
+func (queue *IncomingQueue) Run(queueName string, foo func(data interface{}) error) {
 	retrying := false
 	for {
 		if retrying {
@@ -35,23 +33,23 @@ func (stream *IncomingStream) Run(streamName string, eventName string) {
 		}
 		retrying = true
 
-		log.Println("[INFO] Connecting to stream " + streamName + "...")
+		log.Println("[INFO] Connecting to queue " + queueName + "...")
 
-		channelId := INCOMING_CHANNEL + "invite:" + streamName
-		channel, err := stream.RMQManager.GetChannel(channelId)
+		channelId := INCOMING_CHANNEL + "invite:" + queueName
+		channel, err := queue.RMQManager.GetChannel(channelId)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
 		_, err = channel.QueueDeclare(
-			streamName,
+			queueName,
 			true,
 			false,
 			false,
 			false,
 			amqp091.Table{
-				"x-queue-type": "stream",
+				// "x-queue-type": "stream",
 			},
 		)
 		if err != nil {
@@ -59,39 +57,28 @@ func (stream *IncomingStream) Run(streamName string, eventName string) {
 			continue
 		}
 
-		stream.consume(channel, streamName, eventName)
+		queue.consume(channel, queueName, foo)
 	}
 }
 
-func (stream *IncomingStream) consume(channel *amqp091.Channel, streamName string, eventName string) {
-	err := channel.Qos(
-		100,   // prefetch count
-		0,     // prefetch size
-		false, // global
-	)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
+func (queue *IncomingQueue) consume(channel *amqp091.Channel, queueName string, foo func(data interface{}) error) {
 	consumer, err := channel.Consume(
-		streamName,
-		"consumer-"+streamName, // add a consumer name for offset tracking
-		false,                  // auto-ack
-		false,                  // exclusive
-		false,                  // no-local
-		false,                  // no-wait
-		amqp091.Table{
-			"x-stream-offset": "last", // start from beginning if no offset
-		},
+		queueName,
+		"",
+		false,
+		false,
+		false,
+		false,
+		nil,
 	)
+
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	for delivery := range consumer {
 		log.Println(string(delivery.Body))
-		err := stream.EventManager.Emit(eventName, delivery.Body)
+		err := foo(delivery.Body)
 		if err != nil {
 			log.Println(err)
 			continue // TODO: masukin dead letter queue
@@ -102,5 +89,5 @@ func (stream *IncomingStream) consume(channel *amqp091.Channel, streamName strin
 			return
 		}
 	}
-	log.Println("[WARNING] Disconnected from stream " + streamName)
+	log.Println("[WARNING] Disconnected from queue " + queueName)
 }

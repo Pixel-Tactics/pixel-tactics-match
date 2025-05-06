@@ -15,7 +15,7 @@ const SEND_EVENT = "send:"
 const INCOMING_CHANNEL = "incoming:"
 const INCOMING_PREFIX = "session/incoming/"
 
-type IncomingQueue struct {
+type SessionIncomingQueue struct {
 	Router       gateway.Router
 	EventManager events.EventManager
 	RMQManager   *RMQManager
@@ -26,12 +26,12 @@ type IncomingQueue struct {
 	DeleteUser chan string
 }
 
-func NewIncomingQueue(
+func NewSessionIncomingQueue(
 	router gateway.Router,
 	rmqManager *RMQManager,
 	eventManager events.EventManager,
-) *IncomingQueue {
-	queue := &IncomingQueue{
+) *SessionIncomingQueue {
+	queue := &SessionIncomingQueue{
 		Router:     router,
 		RMQManager: rmqManager,
 		Users:      make(map[string]*UserQueue),
@@ -59,7 +59,7 @@ func NewIncomingQueue(
 	return queue
 }
 
-func (queue *IncomingQueue) Run() {
+func (queue *SessionIncomingQueue) Run() {
 	for {
 		select {
 		case username := <-queue.AddUser:
@@ -85,7 +85,7 @@ func (queue *IncomingQueue) Run() {
 
 type UserQueue struct {
 	Username string
-	Parent   *IncomingQueue
+	Parent   *SessionIncomingQueue
 	Messages chan *messages.Message
 	Close    chan bool
 
@@ -93,7 +93,7 @@ type UserQueue struct {
 	EventManager events.EventManager
 }
 
-func NewUserQueue(username string, parent *IncomingQueue, router gateway.Router, eventManager events.EventManager) *UserQueue {
+func NewUserQueue(username string, parent *SessionIncomingQueue, router gateway.Router, eventManager events.EventManager) *UserQueue {
 	return &UserQueue{
 		Username:     username,
 		Parent:       parent,
